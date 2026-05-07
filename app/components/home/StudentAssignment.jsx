@@ -9,13 +9,18 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiEye,
+  FiCalendar,
+  FiBookOpen,
+  FiUsers,
+  FiSearch,
+  FiFilter,
 } from "react-icons/fi";
 import { FaFilePdf } from "react-icons/fa";
 import Link from "next/link";
 
 const StudentAssignment = () => {
   const { user } = useAuth();
-  console.log(user)
+  console.log(user);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedAssignments, setExpandedAssignments] = useState({});
@@ -34,64 +39,74 @@ const StudentAssignment = () => {
         bg: "bg-gradient-to-br from-blue-50 to-blue-100",
         border: "border-blue-200",
         hover: "hover:shadow-blue-200",
-        badge: "bg-blue-100 text-blue-700"
+        badge: "bg-blue-100 text-blue-700",
+        icon: "text-blue-600",
       },
       {
         bg: "bg-gradient-to-br from-green-50 to-green-100",
         border: "border-green-200",
         hover: "hover:shadow-green-200",
-        badge: "bg-green-100 text-green-700"
+        badge: "bg-green-100 text-green-700",
+        icon: "text-green-600",
       },
       {
         bg: "bg-gradient-to-br from-purple-50 to-purple-100",
         border: "border-purple-200",
         hover: "hover:shadow-purple-200",
-        badge: "bg-purple-100 text-purple-700"
+        badge: "bg-purple-100 text-purple-700",
+        icon: "text-purple-600",
       },
       {
         bg: "bg-gradient-to-br from-orange-50 to-orange-100",
         border: "border-orange-200",
         hover: "hover:shadow-orange-200",
-        badge: "bg-orange-100 text-orange-700"
+        badge: "bg-orange-100 text-orange-700",
+        icon: "text-orange-600",
       },
       {
         bg: "bg-gradient-to-br from-pink-50 to-pink-100",
         border: "border-pink-200",
         hover: "hover:shadow-pink-200",
-        badge: "bg-pink-100 text-pink-700"
+        badge: "bg-pink-100 text-pink-700",
+        icon: "text-pink-600",
       },
       {
         bg: "bg-gradient-to-br from-indigo-50 to-indigo-100",
         border: "border-indigo-200",
         hover: "hover:shadow-indigo-200",
-        badge: "bg-indigo-100 text-indigo-700"
+        badge: "bg-indigo-100 text-indigo-700",
+        icon: "text-indigo-600",
       },
       {
         bg: "bg-gradient-to-br from-teal-50 to-teal-100",
         border: "border-teal-200",
         hover: "hover:shadow-teal-200",
-        badge: "bg-teal-100 text-teal-700"
+        badge: "bg-teal-100 text-teal-700",
+        icon: "text-teal-600",
       },
       {
         bg: "bg-gradient-to-br from-yellow-50 to-yellow-100",
         border: "border-yellow-200",
         hover: "hover:shadow-yellow-200",
-        badge: "bg-yellow-100 text-yellow-700"
+        badge: "bg-yellow-100 text-yellow-700",
+        icon: "text-yellow-600",
       },
       {
         bg: "bg-gradient-to-br from-red-50 to-red-100",
         border: "border-red-200",
         hover: "hover:shadow-red-200",
-        badge: "bg-red-100 text-red-700"
+        badge: "bg-red-100 text-red-700",
+        icon: "text-red-600",
       },
       {
         bg: "bg-gradient-to-br from-cyan-50 to-cyan-100",
         border: "border-cyan-200",
         hover: "hover:shadow-cyan-200",
-        badge: "bg-cyan-100 text-cyan-700"
+        badge: "bg-cyan-100 text-cyan-700",
+        icon: "text-cyan-600",
       },
     ];
-    
+
     let colorIndex = 0;
     assignments.forEach((assignment) => {
       const courseId = assignment.course?._id;
@@ -100,7 +115,7 @@ const StudentAssignment = () => {
         colorIndex++;
       }
     });
-    
+
     return colorMap;
   }, [assignments]);
 
@@ -108,13 +123,14 @@ const StudentAssignment = () => {
   const fetchAssignments = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/student/assignments?semester=${studentSemester}`);
+      const response = await fetch(
+        `/api/student/assignments?semester=${studentSemester}`
+      );
       if (!response.ok) throw new Error("Failed to fetch assignments");
 
       const data = await response.json();
       if (data.success) {
         setAssignments(data.data);
-        // After getting assignments, check submission status for each
         await checkAllSubmissionsStatus(data.data);
       }
     } catch (error) {
@@ -126,22 +142,24 @@ const StudentAssignment = () => {
 
   // Check submission status for a single assignment
   const checkSubmissionStatus = async (assignmentId) => {
-    setCheckingSubmission(prev => ({ ...prev, [assignmentId]: true }));
+    setCheckingSubmission((prev) => ({ ...prev, [assignmentId]: true }));
     try {
-      const response = await fetch(`/api/student/assignment-submitted?assignmentId=${assignmentId}`);
+      const response = await fetch(
+        `/api/student/assignment-submitted?assignmentId=${assignmentId}`
+      );
       if (!response.ok) throw new Error("Failed to check submission");
-      
+
       const data = await response.json();
       if (data.success) {
-        setSubmissionStatusMap(prev => ({
+        setSubmissionStatusMap((prev) => ({
           ...prev,
-          [assignmentId]: data.data
+          [assignmentId]: data.data,
         }));
       }
     } catch (error) {
       console.error("Error checking submission:", error);
     } finally {
-      setCheckingSubmission(prev => ({ ...prev, [assignmentId]: false }));
+      setCheckingSubmission((prev) => ({ ...prev, [assignmentId]: false }));
     }
   };
 
@@ -154,25 +172,25 @@ const StudentAssignment = () => {
 
   // Fetch all submissions for an assignment (for the expanded view)
   const fetchAllSubmissions = async (assignmentId) => {
-    // This is for fetching ALL student submissions when expanding
-    // You can keep your existing fetchSubmissionsForAssignment function
     //eslint-disable-next-line
     if (!window.allSubmissions) window.allSubmissions = {};
-    
+
     if (window.allSubmissions[assignmentId]) return;
-    
-    setExpandedAssignments(prev => ({ ...prev, [assignmentId]: true }));
-    
+
+    setExpandedAssignments((prev) => ({ ...prev, [assignmentId]: true }));
+
     try {
-      const response = await fetch(`/api/student/assignments/submissions?assignmentId=${assignmentId}`);
+      const response = await fetch(
+        `/api/student/assignments/submissions?assignmentId=${assignmentId}`
+      );
       if (!response.ok) throw new Error("Failed to fetch submissions");
-      
+
       const data = await response.json();
       if (data.success) {
         //eslint-disable-next-line
         window.allSubmissions[assignmentId] = data.data;
         // Force re-render
-        setExpandedAssignments(prev => ({ ...prev }));
+        setExpandedAssignments((prev) => ({ ...prev }));
       }
     } catch (error) {
       console.error("Error fetching submissions:", error);
@@ -182,11 +200,11 @@ const StudentAssignment = () => {
   // Toggle assignment expansion
   const toggleAssignment = async (assignmentId) => {
     const isExpanded = expandedAssignments[assignmentId];
-    
+
     if (!isExpanded) {
       await fetchAllSubmissions(assignmentId);
     } else {
-      setExpandedAssignments(prev => ({ ...prev, [assignmentId]: false }));
+      setExpandedAssignments((prev) => ({ ...prev, [assignmentId]: false }));
     }
   };
 
@@ -201,11 +219,11 @@ const StudentAssignment = () => {
   const getSubmissionStatusText = (assignmentId) => {
     const statusData = submissionStatusMap[assignmentId];
 
-    console.log(submissionStatusMap)
+    console.log(submissionStatusMap);
     if (!statusData || !statusData.submitted) {
       return { text: "Not Submitted", color: "red", icon: "❌" };
     }
-    
+
     if (statusData.status === "On Time") {
       return { text: "Submitted", color: "green", icon: "✅" };
     } else {
@@ -276,244 +294,345 @@ const StudentAssignment = () => {
   const filteredAssignments = assignments.filter((assignment) => {
     const matchesSearch =
       assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.course?.courseName?.toLowerCase().includes(searchTerm.toLowerCase());
+      assignment.course?.courseName?.toLowerCase().includes(
+        searchTerm.toLowerCase()
+      );
     const matchesCourse =
       selectedCourse === "all" || assignment.course?._id === selectedCourse;
     return matchesSearch && matchesCourse;
   });
 
   return (
-    <div className="mt-8">
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <FiFileText className="text-2xl text-blue-600" />
-          <h2 className="text-2xl font-bold text-gray-900">My Assignments</h2>
-        </div>
-        <p className="text-gray-600 ml-10">
-          View and track your assignment submissions for {studentSemester} Semester
-        </p>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-gray-700 mb-2 text-sm font-medium">
-              Search
-            </label>
-            <input
-              type="text"
-              placeholder="Search by title or course..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full text-gray-600 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700 mb-2 text-sm font-medium">
-              Course
-            </label>
-            <select
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
-              className="w-full text-gray-600 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="all">All Courses</option>
-              {filterCourses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name} ({course.code})
-                </option>
-              ))}
-            </select>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-lg">
+                  <FiFileText className="text-2xl text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                    My Assignments
+                  </h1>
+                  <p className="text-gray-600 mt-1">
+                    View and track your assignment submissions for{" "}
+                    <span className="font-semibold text-blue-600">
+                      {studentSemester} Semester
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="bg-blue-50 px-4 py-2 rounded-lg">
+                  <span className="text-sm text-blue-700">
+                    Total: {filteredAssignments.length} Assignments
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Assignments Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {loading ? (
-          <div className="col-span-full text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-500 mt-4">Loading assignments...</p>
+        {/* Filters Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <FiFilter className="text-gray-500" />
+            <h3 className="font-semibold text-gray-900">Filter Assignments</h3>
           </div>
-        ) : filteredAssignments.length === 0 ? (
-          <div className="col-span-full text-center py-12 bg-white rounded-lg border border-gray-200">
-            <FiFileText className="text-5xl text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No assignments found for your semester</p>
-          </div>
-        ) : (
-          filteredAssignments.map((assignment) => {
-            const isExpanded = expandedAssignments[assignment._id];
-            const submissionStatus = getSubmissionStatusText(assignment._id);
-            const isChecking = checkingSubmission[assignment._id];
-            const deadlineStatus = getDeadlineStatus(assignment.submissionDate);
-            const courseStyle = courseColorMap.get(assignment.course?._id) || {
-              bg: "bg-gradient-to-br from-gray-50 to-gray-100",
-              border: "border-gray-200",
-              hover: "hover:shadow-gray-100",
-              badge: "bg-gray-100 text-gray-700"
-            };
-            
-            const allSubmissions = window.allSubmissions?.[assignment._id] || [];
-
-            return (
-              <div
-                key={assignment._id}
-                className={`${courseStyle.bg} rounded-xl shadow-sm border ${courseStyle.border} overflow-hidden hover:shadow-lg transition-all duration-300 ${courseStyle.hover}`}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                <FiSearch className="text-gray-400" />
+                Search
+              </label>
+              <input
+                type="text"
+                placeholder="Search by assignment name or course..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                <FiBookOpen className="text-gray-400" />
+                Course
+              </label>
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
               >
-                <div className="p-5">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex items-start gap-2 flex-1">
-                      <Link
-                        href={`/student/assignments/view/${assignment._id}`}
-                        className="flex-shrink-0 mt-1"
-                      >
-                        <FaFilePdf className="text-red-500 text-xl hover:text-red-600 transition-colors" />
-                      </Link>
+                <option value="all">All Courses</option>
+                {filterCourses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name} ({course.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Assignments Grid */}
+        <div className="grid grid-cols-1 gap-6">
+          {loading ? (
+            <div className="text-center py-16 bg-white rounded-xl shadow-sm">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-500 mt-4">Loading assignments...</p>
+            </div>
+          ) : filteredAssignments.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
+              <FiFileText className="text-5xl text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No assignments found for your semester</p>
+              {(searchTerm || selectedCourse !== "all") && (
+                <button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedCourse("all");
+                  }}
+                  className="mt-4 text-blue-600 hover:text-blue-700 text-sm"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredAssignments.map((assignment) => {
+              const isExpanded = expandedAssignments[assignment._id];
+              const submissionStatus = getSubmissionStatusText(assignment._id);
+              const isChecking = checkingSubmission[assignment._id];
+              const deadlineStatus = getDeadlineStatus(assignment.submissionDate);
+              const courseStyle = courseColorMap.get(assignment.course?._id) || {
+                bg: "bg-gradient-to-br from-gray-50 to-gray-100",
+                border: "border-gray-200",
+                hover: "hover:shadow-gray-100",
+                badge: "bg-gray-100 text-gray-700",
+                icon: "text-gray-600",
+              };
+
+              const allSubmissions = window.allSubmissions?.[assignment._id] || [];
+
+              return (
+                <div
+                  key={assignment._id}
+                  className={`${courseStyle.bg} rounded-xl shadow-sm border ${courseStyle.border} overflow-hidden hover:shadow-xl transition-all duration-300 ${courseStyle.hover}`}
+                >
+                  <div className="p-6">
+                    {/* Header with Full Assignment Name */}
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1">
-                          <Link href={`/student/assignments/view/${assignment._id}`}>
-                            {assignment.title}
+                        <div className="flex items-start gap-3">
+                          <Link
+                            href={`/student/assignments/view/${assignment._id}`}
+                            className="flex-shrink-0"
+                          >
+                            <FaFilePdf className="text-red-500 text-2xl hover:text-red-600 transition-colors" />
                           </Link>
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {assignment.course?.courseName} • {assignment.course?.courseCode}
-                        </p>
+                          <div className="flex-1">
+                            {/* Full assignment name displayed prominently */}
+                            <Link
+                              href={`/student/assignments/view/${assignment._id}`}
+                              className="group"
+                            >
+                              <h3 className="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors break-words">
+                                {assignment.title}
+                              </h3>
+                            </Link>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              <span className="text-sm text-gray-600">
+                                {assignment.course?.courseName}
+                              </span>
+                              <span className="text-xs text-gray-400">•</span>
+                              <span className="text-sm font-mono text-gray-500">
+                                {assignment.course?.courseCode}
+                              </span>
+                              {assignment.chapter && (
+                                <>
+                                  <span className="text-xs text-gray-400">•</span>
+                                  <span
+                                    className={`text-xs px-2 py-0.5 rounded-full ${courseStyle.badge}`}
+                                  >
+                                    Chapter {assignment.chapter}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      {isChecking ? (
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">
-                          Checking...
-                        </span>
-                      ) : (
+
+                      {/* Status Badges */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isChecking ? (
+                          <span className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
+                            Checking...
+                          </span>
+                        ) : (
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                              submissionStatus.color === "green"
+                                ? "bg-green-100 text-green-700"
+                                : submissionStatus.color === "orange"
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {submissionStatus.icon} {submissionStatus.text}
+                          </span>
+                        )}
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                            submissionStatus.color === "green"
-                              ? "bg-green-100 text-green-700"
-                              : submissionStatus.color === "orange"
+                          className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                            deadlineStatus.color === "orange"
                               ? "bg-orange-100 text-orange-700"
+                              : deadlineStatus.color === "green"
+                              ? "bg-green-100 text-green-700"
                               : "bg-red-100 text-red-700"
                           }`}
                         >
-                          {submissionStatus.icon} {submissionStatus.text}
+                          {deadlineStatus.text}
                         </span>
-                      )}
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${
-                          deadlineStatus.color === "orange"
-                            ? "bg-orange-100 text-orange-700"
-                            : deadlineStatus.color === "green"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {deadlineStatus.text}
-                      </span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Description */}
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                    {assignment.description}
-                  </p>
-
-                  {/* Submission Date */}
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                    <FiClock className="flex-shrink-0" />
-                    <span>Submission: {formatDateLong(assignment.submissionDate)}</span>
-                  </div>
-
-                  {/* Chapter */}
-                  {assignment.chapter && (
-                    <div className="mb-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${courseStyle.badge}`}>
-                        Chapter {assignment.chapter}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2 border-t border-gray-200 mt-2">
-                    {assignment.pdfUrl && (
-                      <Link
-                        href={`/student/assignments/view/${assignment._id}`}
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
-                      >
-                        <FiEye size={14} /> View
-                      </Link>
+                    {/* Description */}
+                    {assignment.description && (
+                      <div className="mb-4">
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                          {assignment.description}
+                        </p>
+                      </div>
                     )}
-                    <button
-                      onClick={() => toggleAssignment(assignment._id)}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition flex-shrink-0"
-                    >
-                      {isExpanded ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-                      {isExpanded ? "Hide" : "View Submissions"}
-                    </button>
-                  </div>
 
-                  {/* Submissions List - Expandable */}
-                  {isExpanded && (
-                    <div className="mt-4 pt-3 border-t border-gray-200">
-                      <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2 text-sm">
-                        <FiCheckCircle className="text-green-600" />
-                        All Student Submissions
-                      </h4>
-                      {allSubmissions.length === 0 ? (
-                        <p className="text-gray-500 text-center py-3 text-sm">No submissions yet</p>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead className="bg-gray-100 rounded-lg">
-                              <tr>
-                                <th className="px-2 py-1.5 text-left text-gray-800">#</th>
-                                <th className="px-2 py-1.5 text-left text-gray-800">Student</th>
-                                <th className="px-2 py-1.5 text-left text-gray-800">ID</th>
-                                <th className="px-2 py-1.5 text-left text-gray-800">Date</th>
-                                <th className="px-2 py-1.5 text-left text-gray-800">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {allSubmissions.map((sub, index) => (
-                                <tr key={sub._id} className="hover:bg-gray-50 transition">
-                                  <td className="px-2 py-1.5 text-gray-600">{index + 1}</td>
-                                  <td className="px-2 py-1.5 font-medium text-gray-900">
-                                    {sub.studentName || sub.student?.name}
-                                    {String(sub.student?._id || sub.student) === String(user?._id) && (
-                                      <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded">You</span>
-                                    )}
-                                  </td>
-                                  <td className="px-2 py-1.5 text-gray-600">
-                                    {sub.studentCollegeId || sub.student?.collegeId}
-                                  </td>
-                                  <td className="px-2 py-1.5 text-gray-600 whitespace-nowrap">
-                                    {sub.submittedAt ? formatDateShort(sub.submittedAt) : "N/A"}
-                                  </td>
-                                  <td className="px-2 py-1.5">
-                                    <span
-                                      className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${
-                                        sub.status === "onTime"
-                                          ? "bg-green-100 text-green-700"
-                                          : "bg-red-100 text-red-700"
-                                      }`}
-                                    >
-                                      {sub.status === "onTime" ? "On Time" : "Late"}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                    {/* Submission Date */}
+                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-4 p-3 bg-white/50 rounded-lg">
+                      <FiCalendar className="flex-shrink-0 text-blue-500" />
+                      <span className="font-medium">Submission Deadline:</span>
+                      <span>{formatDateLong(assignment.submissionDate)}</span>
                     </div>
-                  )}
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-3 pt-3 border-t border-gray-200">
+                      {assignment.pdfUrl && (
+                        <Link
+                          href={`/student/assignments/view/${assignment._id}`}
+                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+                        >
+                          <FiEye size={16} /> View Assignment
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => toggleAssignment(assignment._id)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition"
+                      >
+                        {isExpanded ? (
+                          <FiChevronUp size={16} />
+                        ) : (
+                          <FiChevronDown size={16} />
+                        )}
+                        {isExpanded ? "Hide Submissions" : "View All Submissions"}
+                        {!isExpanded && allSubmissions.length > 0 && (
+                          <span className="ml-1 text-xs bg-gray-200 px-1.5 py-0.5 rounded-full">
+                            {allSubmissions.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Submissions List - Expandable */}
+                    {isExpanded && (
+                      <div className="mt-5 pt-4 border-t border-gray-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <FiUsers className="text-green-600" />
+                          <h4 className="font-semibold text-gray-900">
+                            All Student Submissions
+                          </h4>
+                          <span className="text-xs text-gray-500">
+                            ({allSubmissions.length} total)
+                          </span>
+                        </div>
+                        {allSubmissions.length === 0 ? (
+                          <div className="text-center py-6 bg-gray-50 rounded-lg">
+                            <p className="text-gray-500 text-sm">
+                              No submissions yet
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-gray-100 border-b border-gray-200">
+                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
+                                    #
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
+                                    Student Name
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
+                                    Student ID
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
+                                    Submission Date
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
+                                    Status
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {allSubmissions.map((sub, index) => (
+                                  <tr
+                                    key={sub._id}
+                                    className="hover:bg-gray-50 transition"
+                                  >
+                                    <td className="px-3 py-2 text-gray-600">
+                                      {index + 1}
+                                    </td>
+                                    <td className="px-3 py-2 font-medium text-gray-900">
+                                      {sub.studentName || sub.student?.name}
+                                      {String(sub.student?._id || sub.student) ===
+                                        String(user?._id) && (
+                                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                          You
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 text-gray-600 font-mono text-xs">
+                                      {sub.studentCollegeId || sub.student?.collegeId}
+                                    </td>
+                                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                                      {sub.submittedAt
+                                        ? formatDateShort(sub.submittedAt)
+                                        : "N/A"}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span
+                                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                          sub.status === "onTime"
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-red-100 text-red-700"
+                                        }`}
+                                      >
+                                        {sub.status === "onTime" ? "On Time" : "Late"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
