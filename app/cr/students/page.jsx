@@ -67,6 +67,7 @@ const CRStudentsPage = () => {
               phone: user.phone || null,
               email: user.email || null,
               semester: user.semester,
+              session: user.session,
               role: 'cr',
               isCR: true, // Mark as CR for special styling
             };
@@ -244,7 +245,7 @@ const CRStudentsPage = () => {
               placeholder="Search by name or college ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="flex-1 text-gray-500 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             />
             {searchTerm && (
               <button
@@ -444,7 +445,7 @@ const CRStudentsPage = () => {
                     type="text"
                     value={crSemester}
                     disabled
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Student will be added to your semester</p>
                 </div>
@@ -491,7 +492,7 @@ const CRStudentsPage = () => {
                     value={editFormData.name}
                     onChange={handleEditInputChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 text-gray-500 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                   />
                 </div>
 
@@ -501,7 +502,7 @@ const CRStudentsPage = () => {
                     type="text"
                     value={editingStudent.collegeId}
                     disabled
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">College ID cannot be changed</p>
                 </div>
@@ -516,7 +517,7 @@ const CRStudentsPage = () => {
                     value={editFormData.phone}
                     onChange={handleEditInputChange}
                     pattern="01[3-9]\d{8}"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="e.g., 017xxxxxxxx"
                   />
                 </div>
@@ -530,7 +531,7 @@ const CRStudentsPage = () => {
                     name="email"
                     value={editFormData.email}
                     onChange={handleEditInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="student@example.com"
                   />
                 </div>
@@ -541,7 +542,7 @@ const CRStudentsPage = () => {
                     type="text"
                     value={editingStudent.semester}
                     disabled
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Semester cannot be changed by CR</p>
                 </div>

@@ -15,6 +15,7 @@ import Link from "next/link";
 
 const StudentAssignment = () => {
   const { user } = useAuth();
+  console.log(user)
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedAssignments, setExpandedAssignments] = useState({});

@@ -37,6 +37,7 @@ const Header = () => {
                 <Image
                   src={ACCLOGO}
                   alt="ACC College Logo"
+                  sizes="(max-width: 640px) 40px, (max-width: 768px) 56px, (max-width: 1024px) 64px, 80px"
                   fill
                   className="object-contain"
                   priority
@@ -64,6 +65,7 @@ const Header = () => {
                   src={BBALOGO}
                   alt="BBA Department Logo"
                   fill
+                  sizes="(max-width: 640px) 32px, (max-width: 768px) 48px, (max-width: 1024px) 56px, 64px"
                   className="object-contain"
                   priority
                 />

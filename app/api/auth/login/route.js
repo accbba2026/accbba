@@ -117,6 +117,7 @@ export async function POST(request) {
       name: user.name,
       collegeId: user.collegeId,
       semester: user.semester || null,
+      session: user.session || null,
       email: user.email,
       role: user.role,
     };
