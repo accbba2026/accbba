@@ -668,10 +668,6 @@ export default function LoginPage() {
             )}
           </>
         )}
-
-        <div className="text-center text-xs text-gray-400 mt-4">
-          <p>Demo Student IDs: 521017, 521018, 521019, 521020</p>
-        </div>
       </div>
     </div>
   );

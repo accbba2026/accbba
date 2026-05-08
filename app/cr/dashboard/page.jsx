@@ -7,7 +7,8 @@ import {
   FaTasks, 
   FaCalendarCheck,
   FaChalkboardTeacher,
-  FaUserTie
+  FaUserTie,
+  FaArrowLeft 
 } from "react-icons/fa";
 
 const Page = () => {
@@ -18,6 +19,15 @@ const Page = () => {
         <div className="mb-8">
           <h1 className="text-3xl text-center font-bold text-gray-900">CR/ACR Dashboard</h1>
           <p className="text-gray-600 text-center mt-1">Welcome back, CR/ACR</p>
+        </div>
+
+        <div className="block py-2">
+          <Link href="/" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200">
+          <span className="mr-2 p-2 text-black bg-cyan-200 rounded-2xl">
+            <FaArrowLeft/>
+          </span>
+            Go Home
+          </Link>
         </div>
 
         {/* Services Section */}

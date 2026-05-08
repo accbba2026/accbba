@@ -18,12 +18,11 @@ import { FaStar, FaUsers, FaGraduationCap } from "react-icons/fa";
 
 const CRStudentsPage = () => {
   const { user } = useAuth();
-  console.log(user);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
-  
+
   // Add Student Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,7 +32,7 @@ const CRStudentsPage = () => {
     email: "",
     semester: "",
   });
-  
+
   // Edit Student Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
@@ -50,15 +49,19 @@ const CRStudentsPage = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/cr/get-students?semester=${crSemester}`);
+      const response = await fetch(
+        `/api/cr/get-students?semester=${crSemester}`,
+      );
       const data = await response.json();
       if (data.success) {
         let allStudents = [...data.data];
-        
+
         // Add the CR to the list if they are in the same semester
-        if (user && user.role === 'cr' && user.semester === crSemester) {
+        if (user && user.role === "cr" && user.semester === crSemester) {
           // Check if CR is already in the list (avoid duplicate)
-          const crExists = allStudents.some(s => s.collegeId === user.collegeId);
+          const crExists = allStudents.some(
+            (s) => s.collegeId === user.collegeId,
+          );
           if (!crExists && user.collegeId) {
             const crStudent = {
               _id: user.id,
@@ -68,13 +71,13 @@ const CRStudentsPage = () => {
               email: user.email || null,
               semester: user.semester,
               session: user.session,
-              role: 'cr',
+              role: "cr",
               isCR: true, // Mark as CR for special styling
             };
             allStudents.unshift(crStudent); // Add CR at the top
           }
         }
-        
+
         setStudents(allStudents);
       }
     } catch (error) {
@@ -87,15 +90,16 @@ const CRStudentsPage = () => {
 
   useEffect(() => {
     if (user) {
-        //eslint-disable-next-line 
+      //eslint-disable-next-line
       fetchStudents();
     }
   }, [user]);
 
   // Filter students based on search
-  const filteredStudents = students.filter((student) =>
-    student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.collegeId?.includes(searchTerm)
+  const filteredStudents = students.filter(
+    (student) =>
+      student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.collegeId?.includes(searchTerm),
   );
 
   // Handle input change for add form
@@ -135,7 +139,13 @@ const CRStudentsPage = () => {
 
       if (data.success) {
         setMessage({ type: "success", text: "Student added successfully!" });
-        setFormData({ name: "", collegeId: "", phone: "", email: "", semester: "" });
+        setFormData({
+          name: "",
+          collegeId: "",
+          phone: "",
+          email: "",
+          semester: "",
+        });
         setIsAddModalOpen(false);
         fetchStudents();
       } else {
@@ -151,7 +161,10 @@ const CRStudentsPage = () => {
   // Open edit modal (only for regular students, not CR)
   const openEditModal = (student) => {
     if (student.isCR) {
-      setMessage({ type: "error", text: "You cannot edit your own CR profile here. Go to Profile page." });
+      setMessage({
+        type: "error",
+        text: "You cannot edit your own CR profile here. Go to Profile page.",
+      });
       return;
     }
     setEditingStudent(student);
@@ -201,17 +214,21 @@ const CRStudentsPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
-        
         {/* Header */}
         <div className="mb-8">
           <div className="flex justify-between items-center">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <FaStar className="text-3xl text-green-600" />
-                <h1 className="text-3xl font-bold text-gray-900">Student Management</h1>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Student Management
+                </h1>
               </div>
               <p className="text-gray-600 ml-11">
-                Manage students for <span className="font-semibold text-green-600">{crSemester} Semester</span>
+                Manage students for{" "}
+                <span className="font-semibold text-green-600">
+                  {crSemester} Semester
+                </span>
               </p>
             </div>
             <button
@@ -238,28 +255,37 @@ const CRStudentsPage = () => {
 
         {/* Search Bar */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex items-center gap-4">
-            <FiSearch className="text-gray-400 text-xl" />
-            <input
-              type="text"
-              placeholder="Search by name or college ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 text-gray-500 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <FiX />
-              </button>
-            )}
+          {/* Mobile layout (stacked) / Desktop layout (flex row) */}
+          <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+            {/* Search input wrapper with icon */}
+            <div className="relative flex-1">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl hidden md:block" />
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl md:hidden" />
+              <input
+                type="text"
+                placeholder="Search by name or college ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full text-gray-500 pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              {/* Clear button inside input on mobile */}
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  <FiX />
+                </button>
+              )}
+            </div>
+
+            {/* Refresh button - full width on mobile */}
             <button
               onClick={fetchStudents}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition md:w-auto w-full"
             >
-              <FiRefreshCw className={loading ? "animate-spin" : ""} /> Refresh
+              <FiRefreshCw className={loading ? "animate-spin" : ""} />
+              <span>Refresh</span>
             </button>
           </div>
         </div>
@@ -283,28 +309,49 @@ const CRStudentsPage = () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">#</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Name</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">College ID</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Phone</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Email</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Semester</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Role</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Actions</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    #
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    Name
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    College ID
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    Phone
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    Email
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    Semester
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    Role
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
-                      {loading ? "Loading..." : "No students found in your semester"}
+                    <td
+                      colSpan="8"
+                      className="px-6 py-12 text-center text-gray-500"
+                    >
+                      {loading
+                        ? "Loading..."
+                        : "No students found in your semester"}
                     </td>
                   </tr>
                 ) : (
                   filteredStudents.map((student, index) => (
-                    <tr 
-                      key={student._id} 
-                      className={`hover:bg-gray-50 transition ${student.isCR ? 'bg-yellow-50' : ''}`}
+                    <tr
+                      key={student._id}
+                      className={`hover:bg-gray-50 transition ${student.isCR ? "bg-yellow-50" : ""}`}
                     >
                       <td className="px-6 py-4 text-gray-600">{index + 1}</td>
                       <td className="px-6 py-4">
@@ -314,27 +361,51 @@ const CRStudentsPage = () => {
                           ) : (
                             <FiUser className="text-green-500" />
                           )}
-                          <span className={`font-medium ${student.isCR ? 'text-yellow-700' : 'text-gray-900'}`}>
+                          <span
+                            className={`font-medium ${student.isCR ? "text-yellow-700" : "text-gray-900"}`}
+                          >
                             {student.name}
-                            {student.isCR && <span className="ml-2 text-xs text-yellow-600">(You - CR)</span>}
+                            {student.isCR && (
+                              <span className="ml-2 text-xs text-yellow-600">
+                                (You - CR)
+                              </span>
+                            )}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-mono text-gray-600">{student.collegeId}</td>
-                      <td className="px-6 py-4 text-gray-600">{student.phone || "—"}</td>
-                      <td className="px-6 py-4 text-gray-600">{student.email || "—"}</td>
+                      <td className="px-6 py-4 font-mono text-gray-600">
+                        {student.collegeId}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {student.phone || "—"}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {student.email || "—"}
+                      </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          student.isCR ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            student.isCR
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
                           {student.semester}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                          student.isCR ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {student.isCR ? 'CR' : 'Student'}
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
+                            student.isCR
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {student.isCR
+                            ? "CR"
+                            : student?.role === "student"
+                              ? "Student"
+                              : "CR"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -347,7 +418,9 @@ const CRStudentsPage = () => {
                           </button>
                         )}
                         {student.isCR && (
-                          <span className="text-gray-400 text-sm">Edit from Profile</span>
+                          <span className="text-gray-400 text-sm">
+                            Edit from Profile
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -373,15 +446,22 @@ const CRStudentsPage = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">Add New Student</h2>
-                <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Add New Student
+                </h2>
+                <button
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   <FiX size={24} />
                 </button>
               </div>
-              
+
               <form onSubmit={handleAddStudent} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">Full Name *</label>
+                  <label className="block text-gray-700 mb-2 font-medium">
+                    Full Name *
+                  </label>
                   <input
                     type="text"
                     name="name"
@@ -394,7 +474,9 @@ const CRStudentsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">College ID (6 digits) *</label>
+                  <label className="block text-gray-700 mb-2 font-medium">
+                    College ID (6 digits) *
+                  </label>
                   <input
                     type="text"
                     name="collegeId"
@@ -420,7 +502,9 @@ const CRStudentsPage = () => {
                     className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="e.g., 017xxxxxxxx"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Bangladeshi number: 01XXXXXXXXX</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Bangladeshi number: 01XXXXXXXXX
+                  </p>
                 </div>
 
                 <div>
@@ -447,7 +531,9 @@ const CRStudentsPage = () => {
                     disabled
                     className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Student will be added to your semester</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Student will be added to your semester
+                  </p>
                 </div>
 
                 <div className="flex gap-3 pt-4">
@@ -477,15 +563,22 @@ const CRStudentsPage = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
               <div className="flex justify-between items-center p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">Edit Student</h2>
-                <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Edit Student
+                </h2>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   <FiX size={24} />
                 </button>
               </div>
-              
+
               <form onSubmit={handleUpdateStudent} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">Full Name *</label>
+                  <label className="block text-gray-700 mb-2 font-medium">
+                    Full Name *
+                  </label>
                   <input
                     type="text"
                     name="name"
@@ -497,14 +590,18 @@ const CRStudentsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">College ID</label>
+                  <label className="block text-gray-700 mb-2 font-medium">
+                    College ID
+                  </label>
                   <input
                     type="text"
                     value={editingStudent.collegeId}
                     disabled
                     className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">College ID cannot be changed</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    College ID cannot be changed
+                  </p>
                 </div>
 
                 <div>
@@ -537,14 +634,18 @@ const CRStudentsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">Semester</label>
+                  <label className="block text-gray-700 mb-2 font-medium">
+                    Semester
+                  </label>
                   <input
                     type="text"
                     value={editingStudent.semester}
                     disabled
                     className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Semester cannot be changed by CR</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Semester cannot be changed by CR
+                  </p>
                 </div>
 
                 <div className="flex gap-3 pt-4">

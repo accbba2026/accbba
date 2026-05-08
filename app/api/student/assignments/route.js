@@ -9,7 +9,7 @@ export async function GET(request) {
     await connectToDatabase();
     const currentUser = await getCurrentUser();
     
-    if (!currentUser || currentUser.role !== 'student') {
+    if (!currentUser) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 });
     }
     

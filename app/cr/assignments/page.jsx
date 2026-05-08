@@ -728,27 +728,9 @@ const CRAssignmentsPage = () => {
           </div>
 
           <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-gray-700 mb-2 font-medium">
-                Select Course
-              </label>
-              <select
-                value={selectedCourse}
-                onChange={(e) => setSelectedCourse(e.target.value)}
-                className="w-full text-gray-600 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Courses</option>
-                {courses.map((course) => (
-                  <option key={course._id} value={course._id}>
-                    {course.courseName} ({course.courseCode})
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-800">
-                This will generate a PDF report showing all students and their
+                This will take you to report page showing all students and their
                 submission status for all assignments.
               </p>
             </div>

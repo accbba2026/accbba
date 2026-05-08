@@ -20,7 +20,6 @@ import Link from "next/link";
 
 const StudentAssignment = () => {
   const { user } = useAuth();
-  console.log(user);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedAssignments, setExpandedAssignments] = useState({});
@@ -213,13 +212,12 @@ const StudentAssignment = () => {
       //eslint-disable-next-line
       fetchAssignments();
     }
+    //eslint-disable-next-line
   }, [user]);
 
   // Get submission status text from the map
   const getSubmissionStatusText = (assignmentId) => {
     const statusData = submissionStatusMap[assignmentId];
-
-    console.log(submissionStatusMap);
     if (!statusData || !statusData.submitted) {
       return { text: "Not Submitted", color: "red", icon: "❌" };
     }

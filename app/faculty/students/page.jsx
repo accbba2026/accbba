@@ -40,6 +40,7 @@ export default function StudentManagement() {
   const [bulkSemester, setBulkSemester] = useState("");
   const [bulkSession, setBulkSession] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [studentFetchLoad, setStudentFetchLoad] = useState(false);
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,7 +62,7 @@ export default function StudentManagement() {
   });
 
   // Collapsible sections state
-  const [isAddFormOpen, setIsAddFormOpen] = useState(true);
+  const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [isBulkOperationsOpen, setIsBulkOperationsOpen] = useState(false);
 
   // Fetch students on load
@@ -74,6 +75,7 @@ export default function StudentManagement() {
 
   const fetchStudents = async () => {
     try {
+      setStudentFetchLoad(true)
       const response = await fetch("/api/user/get-students");
       const data = await response.json();
       if (data.success) {
@@ -81,6 +83,8 @@ export default function StudentManagement() {
       }
     } catch (error) {
       console.error("Error fetching students:", error);
+    } finally{
+      setStudentFetchLoad(false)
     }
   };
 
@@ -152,8 +156,6 @@ export default function StudentManagement() {
           collegeId: "",
           phone: "",
           email: "",
-          semester: "1st",
-          session: "2024-25",
           status: "active",
           role: "student",
         });
@@ -872,7 +874,7 @@ export default function StudentManagement() {
             <p className="text-gray-500">
               {searchTerm
                 ? "No students match your search."
-                : "No students found. Add your first student!"}
+                : studentFetchLoad ? "Loading..." : "No students found. Add your first student!"}
             </p>
           </div>
         )}

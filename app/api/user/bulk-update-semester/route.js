@@ -169,8 +169,14 @@ export async function GET(request) {
     console.log("GET request - action:", action);
 
     if (action === "stats") {
-      // Get semester statistics
+      // Get semester statistics - ONLY for students and CRs
       const semesterStats = await User.aggregate([
+        { 
+          $match: { 
+            role: { $in: ["student", "cr"] },
+            status: "active" // Optional: only count active users
+          } 
+        },
         {
           $group: {
             _id: "$semester",
@@ -180,22 +186,25 @@ export async function GET(request) {
         { $sort: { _id: 1 } },
       ]);
 
-      console.log("Semester stats:", semesterStats);
-
       return NextResponse.json({
         success: true,
         data: semesterStats,
       });
     }
 
-    // Get all active students grouped by semester
+    // Get all active students and CRs grouped by semester
     const studentsBySemester = await User.aggregate([
-      { $match: { status: "active" } },
+      { $match: { status: "active", role: { $in: ["student", "cr"] } } },
       {
         $group: {
           _id: "$semester",
           students: {
-            $push: { id: "$_id", name: "$name", collegeId: "$collegeId" },
+            $push: { 
+              id: "$_id", 
+              name: "$name", 
+              collegeId: "$collegeId",
+              role: "$role" // Include role to distinguish between student and CR
+            },
           },
           count: { $sum: 1 },
         },

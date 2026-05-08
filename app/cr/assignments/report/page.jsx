@@ -1,252 +1,509 @@
+// app/cr/assignments/report/page.js
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import Link from "next/link";
-import { FiArrowLeft } from "react-icons/fi";
+import { FiArrowLeft, FiDownload } from "react-icons/fi";
 
 export default function ReportPage() {
   const { user } = useAuth();
   const [reportData, setReportData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState("");
   const [courses, setCourses] = useState([]);
+  const [hasSelectedCourse, setHasSelectedCourse] = useState(false);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
-  // Add print styles
+  // Add print styles for A4
   useEffect(() => {
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = `
       @media print {
         .no-print {
           display: none !important;
         }
-        .print-only {
-          display: block !important;
-        }
         body {
           padding: 0;
           margin: 0;
+          background: white;
         }
         .print-container {
-          padding: 20px;
+          padding: 0;
+          margin: 0;
+        }
+        .report-page {
+          page-break-after: always;
+          margin: 0;
+          padding: 0.5cm;
+        }
+        .report-page:last-child {
+          page-break-after: auto;
         }
         table {
-          page-break-inside: avoid;
+          width: 100%;
+          font-size: 10pt;
         }
-        .course-section {
-          page-break-after: always;
+        @page {
+          size: A4;
+          margin: 0.5cm;
         }
-        .course-section:last-child {
-          page-break-after: auto;
+        h3 {
+          margin: 0 0 5px 0;
+        }
+        .header-info {
+          margin-bottom: 8px;
+        }
+        th, td {
+          padding: 4px 6px !important;
+        }
+      }
+      .status-on-time {
+        color: #166534;
+        font-weight: 500;
+      }
+      .status-late {
+        color: #991b1b;
+        font-weight: 500;
+      }
+      .status-no-submission {
+        color: #9ca3af;
+      }
+      @media screen {
+        .report-page {
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          margin-bottom: 20px;
+          padding: 16px;
         }
       }
     `;
     document.head.appendChild(style);
-    
+
     return () => {
       document.head.removeChild(style);
     };
   }, []);
 
+  // Format date helper
+  const formatDate = (date) => {
+    const d = new Date(date);
+    const day = d.getDate();
+    const month = d.toLocaleString("default", { month: "long" });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  const formatDateTime = (date) => {
+    return `${formatDate(date)} at ${new Date(date).toLocaleTimeString(
+      "en-US",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      },
+    )}`;
+  };
+
+  // Fetch courses on page load
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCourses = async () => {
+      if (!user) return;
+
+      setLoadingCourses(true);
       try {
-        const semester = user?.semester || "1st";
-        
-        // Fetch courses
-        const coursesRes = await fetch(`/api/cr/courses?semester=${semester}`);
-        const coursesData = await coursesRes.json();
-        if (coursesData.success) setCourses(coursesData.data);
-        
-        // Fetch assignments
-        const assignmentsRes = await fetch(`/api/cr/assignments?semester=${semester}`);
-        const assignmentsData = await assignmentsRes.json();
-        
-        // Fetch students
-        const studentsRes = await fetch(`/api/cr/get-students?semester=${semester}`);
-        const studentsData = await studentsRes.json();
-        
-        // Create a map of collegeId to student _id for easy lookup
-        const studentIdMap = new Map();
-        studentsData.data.forEach(student => {
-          studentIdMap.set(student.collegeId, student._id);
-          studentIdMap.set(student._id, student._id);
-        });
-        
-        // Fetch submissions for each assignment
-        const assignmentIds = assignmentsData.data.map(a => a._id);
-        const submissionsPromises = assignmentIds.map(id =>
-          fetch(`/api/cr/assignments/submissions?assignmentId=${id}`).then(res => res.json())
+        const response = await fetch(
+          `/api/cr/courses?semester=${user.semester}`,
         );
-        
-        const submissionsResults = await Promise.all(submissionsPromises);
-        
-        // Create a map for quick submission lookup using student _id
-        const submissionsMap = new Map();
-        submissionsResults.forEach((result, index) => {
-          if (result.success && result.data) {
-            const assignmentId = assignmentIds[index];
-            result.data.forEach(submission => {
-              const studentId = submission.student?._id || submission.student;
-              const key = `${assignmentId}_${studentId}`;
-              submissionsMap.set(key, submission);
-              
-              if (submission.student?.collegeId) {
-                const collegeIdKey = `${assignmentId}_${submission.student.collegeId}`;
-                submissionsMap.set(collegeIdKey, submission);
-              }
-            });
-          }
-        });
-        
-        setReportData({
-          assignments: assignmentsData.data,
-          students: studentsData.data,
-          submissionsMap: submissionsMap,
-          studentIdMap: studentIdMap,
-        });
+        const result = await response.json();
+
+        if (result.success) {
+          setCourses(result.data);
+        } else {
+          console.error("Failed to fetch courses:", result.message);
+        }
       } catch (error) {
-        console.error("Error fetching report data:", error);
+        console.error("Error fetching courses:", error);
+      } finally {
+        setLoadingCourses(false);
+      }
+    };
+
+    fetchCourses();
+  }, [user]);
+
+  // Fetch report when course is selected
+  useEffect(() => {
+    const fetchReport = async () => {
+      if (!user || !selectedCourse || selectedCourse === "") return;
+
+      setLoading(true);
+      setHasSelectedCourse(true);
+
+      try {
+        const url = `/api/cr/assignment-report?semester=${user.semester}&courseId=${selectedCourse}`;
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.success) {
+          setReportData(result.data);
+        } else {
+          console.error("Failed to fetch report:", result.message);
+          setReportData(null);
+        }
+      } catch (error) {
+        console.error("Error fetching report:", error);
+        setReportData(null);
       } finally {
         setLoading(false);
       }
     };
-    
-    if (user) fetchData();
-  }, [user]);
 
-  if (loading) return <div className="text-center py-8">Loading report...</div>;
-  if (!reportData) return <div className="text-center py-8">No data available</div>;
+    fetchReport();
+  }, [selectedCourse, user]);
 
-  const filteredAssignments = selectedCourse
-    ? reportData.assignments.filter(a => a.course?._id === selectedCourse)
-    : reportData.assignments;
+  const getSubmissionStatus = (assignmentId, studentId) => {
+    if (!reportData || !reportData.submissions) return null;
 
-  const groupedByCourse = filteredAssignments.reduce((acc, assignment) => {
-    const courseId = assignment.course?._id;
-    if (!acc[courseId]) {
-      acc[courseId] = {
-        courseName: assignment.course?.courseName,
-        courseCode: assignment.course?.courseCode,
-        assignments: [],
-      };
-    }
-    acc[courseId].assignments.push(assignment);
-    return acc;
-  }, {});
+    const submission = reportData.submissions.find(
+      (sub) => sub.assignmentId === assignmentId && sub.studentId === studentId,
+    );
 
-  const getSubmissionStatus = (assignmentId, student) => {
-    let submission = null;
-    
-    const keyById = `${assignmentId}_${student._id}`;
-    submission = reportData.submissionsMap.get(keyById);
-    
-    if (!submission && student.collegeId) {
-      const keyByCollegeId = `${assignmentId}_${student.collegeId}`;
-      submission = reportData.submissionsMap.get(keyByCollegeId);
-    }
-    
     if (!submission) {
-      return { text: "", class: "bg-gray-100 text-gray-700" };
+      return { text: "", class: "status-no-submission" };
     }
-    
-    const assignment = reportData.assignments.find(a => a._id === assignmentId);
+
+    const assignment = reportData.assignments.find(
+      (a) => a._id === assignmentId,
+    );
     const subDate = new Date(submission.submittedAt);
     const dueDate = new Date(assignment.submissionDate);
-    
+
+    // Set both dates to start of day for fair comparison
+    subDate.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+
+    // On Time if submitted on or before due date
     if (subDate <= dueDate) {
-      return { text: "On Time", class: "bg-green-100 text-green-700" };
+      return { text: "✅ On Time", class: "status-on-time" };
     } else {
-      return { text: "Late", class: "bg-red-100 text-red-700" };
+      return { text: "⚠️ Late", class: "status-late" };
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="container mx-auto max-w-7xl">
-        {/* Header with navigation - Hidden when printing */}
-        <div className="no-print mb-6 flex justify-between items-center">
-          <Link href="/cr/assignments" className="flex items-center gap-2 text-green-600">
-            <FiArrowLeft /> Back to Assignments
-          </Link>
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Print Report
-          </button>
+  // Group assignments by course
+  const getAssignmentsByCourse = () => {
+    if (!reportData) return {};
+
+    return reportData.assignments.reduce((acc, assignment) => {
+      const courseId = assignment.courseId;
+      if (!acc[courseId]) {
+        acc[courseId] = {
+          courseName: assignment.courseName,
+          courseCode: assignment.courseCode,
+          assignments: [],
+        };
+      }
+      acc[courseId].assignments.push(assignment);
+      return acc;
+    }, {});
+  };
+
+  // Show loading for courses
+  if (loadingCourses) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-3"></div>
+          <p className="text-gray-600 text-sm">Loading courses...</p>
         </div>
-        
-        {/* Course selector - Hidden when printing */}
-        <div className="no-print mb-4">
-          <select
-            value={selectedCourse}
-            onChange={(e) => setSelectedCourse(e.target.value)}
-            className="px-4 text-gray-600 py-2 border rounded-lg"
-          >
-            <option value="">All Courses</option>
-            {courses.map(course => (
-              <option key={course._id} value={course._id}>
-                {course.courseName} ({course.courseCode})
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Report Content - This will be printed */}
-        <div className="print-container">
-          {Object.entries(groupedByCourse).length === 0 ? (
-            <div className="text-center py-8 bg-white rounded-lg">
-              <p className="text-gray-500">No assignments found for the selected course.</p>
-            </div>
-          ) : (
-            Object.entries(groupedByCourse).map(([courseId, courseData], idx) => (
-              <div 
-                key={courseId} 
-                className={`bg-white rounded-lg shadow-lg mb-8 p-6 print:shadow-none print:mb-4 ${idx < Object.entries(groupedByCourse).length - 1 ? 'course-section' : ''}`}
+      </div>
+    );
+  }
+
+  // Initial state - no course selected
+  if (!hasSelectedCourse) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="container mx-auto max-w-5xl">
+          <div className="no-print mb-4 flex flex-wrap justify-between items-center gap-3">
+            <Link
+              href="/cr/assignments"
+              className="flex items-center gap-2 text-green-600 text-sm"
+            >
+              <FiArrowLeft /> Back to Assignments
+            </Link>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="px-3 py-1.5 w-full sm:w-auto min-w-[200px] text-sm border rounded-lg text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
-                {/* University Header for Print */}
-                <div className="text-center mb-6">
-                  <h1 className="text-2xl text-gray-600 font-bold">Assignment Submission Report</h1>
-                  <h2 className="text-xl text-gray-600 mt-2">{courseData.courseName} ({courseData.courseCode})</h2>
-                  <p className="text-gray-600">Semester: {user?.semester} | Generated: {new Date().toLocaleDateString()}</p>
+                <option value="">Select a course</option>
+                {courses.map((course) => (
+                  <option key={course._id} value={course._id}>
+                    {course.courseName} ({course.courseCode})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => window.print()}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                disabled={!selectedCourse}
+              >
+                <FiDownload size={14} /> Print
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-4 sm:p-6 md:p-8 text-center">
+            <div className="mb-3 sm:mb-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <FiDownload className="text-gray-400 text-xl sm:text-2xl md:text-2xl" />
+              </div>
+            </div>
+            <p className="text-gray-700 font-medium text-base sm:text-lg mb-1 sm:mb-2">
+              No Report Selected
+            </p>
+            <p className="text-gray-500 text-xs sm:text-sm max-w-xs sm:max-w-md mx-auto px-2">
+              Please select a course from the dropdown above to view the
+              assignment submission report
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state for report
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6">
+        <div className="container mx-auto max-w-5xl px-2 sm:px-4">
+          {/* Header with navigation and controls */}
+          <div className="no-print mb-4 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
+            <Link
+              href="/cr/assignments"
+              className="flex items-center gap-2 text-green-600 text-sm hover:text-green-700 transition-colors w-full sm:w-auto justify-center sm:justify-start"
+            >
+              <FiArrowLeft size={16} />
+              <span>Back to Assignments</span>
+            </Link>
+
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="px-3 py-2 sm:py-1.5 text-sm border rounded-lg text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto min-w-[180px] md:min-w-[200px]"
+              >
+                <option value="">Select a course</option>
+                {courses.map((course) => (
+                  <option key={course._id} value={course._id}>
+                    {course.courseName} ({course.courseCode})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => window.print()}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 sm:py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                disabled={!selectedCourse}
+              >
+                <FiDownload size={14} />
+                <span>Print</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Loading content */}
+          <div className="bg-white rounded-lg shadow p-6 sm:p-8 md:p-12 text-center">
+            <div className="inline-block">
+              <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-green-600 mx-auto mb-3"></div>
+            </div>
+            <p className="text-gray-600 text-sm sm:text-base">
+              Loading report data...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No data available for selected course
+  if (!reportData || reportData.assignments.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="container mx-auto max-w-5xl">
+          <div className="no-print mb-4 flex flex-wrap justify-between items-center gap-3">
+            <Link
+              href="/cr/assignments"
+              className="flex items-center gap-2 text-green-600 text-sm"
+            >
+              <FiArrowLeft /> Back
+            </Link>
+
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="px-3 py-2 sm:py-1.5 text-sm border rounded-lg text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto min-w-[180px] md:min-w-[200px]"
+              >
+                <option value="">Select a course</option>
+                {courses.map((course) => (
+                  <option key={course._id} value={course._id}>
+                    {course.courseName} ({course.courseCode})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => window.print()}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 sm:py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                disabled={!selectedCourse}
+              >
+                <FiDownload size={14} /> Print
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6 text-center">
+            <p className="text-gray-500">
+              No assignments found for{" "}
+              {courses.find((c) => c._id === selectedCourse)?.courseName ||
+                "this course"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const assignmentsByCourse = getAssignmentsByCourse();
+  const studentList = reportData.students || [];
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-3">
+      <div className="container mx-auto max-w-6xl">
+        {/* Controls - Hidden when printing */}
+        <div className="no-print mb-4 flex flex-wrap justify-between items-center gap-3">
+          <Link
+            href="/cr/assignments"
+            className="flex items-center gap-2 text-green-600 hover:text-green-700 text-sm"
+          >
+            <FiArrowLeft /> Back
+          </Link>
+
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <select
+              value={selectedCourse}
+              onChange={(e) => setSelectedCourse(e.target.value)}
+              className="px-3 py-2 sm:py-1.5 text-sm border rounded-lg text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto min-w-[180px] md:min-w-[200px]"
+            >
+              <option value="">Select a course</option>
+              {courses.map((course) => (
+                <option key={course._id} value={course._id}>
+                  {course.courseName} ({course.courseCode})
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => window.print()}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 sm:py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition w-full sm:w-auto"
+            >
+              <FiDownload size={14} /> Print
+            </button>
+          </div>
+        </div>
+
+        {/* Report Content - A4 Optimized */}
+        <div className="print-container">
+          {Object.entries(assignmentsByCourse).map(
+            ([courseId, courseData], idx) => (
+              <div key={courseId} className="report-page">
+                {/* Header */}
+                <div className="border-b border-gray-300 pb-2 mb-3">
+                  <h3 className="text-base font-bold text-gray-800">
+                    {courseData.courseName} ({courseData.courseCode})
+                  </h3>
+                  <div className="text-xs text-gray-500 flex justify-between mt-1">
+                    <span>Semester: {reportData.semester}</span>
+                    <span>Date: {formatDate(new Date())}</span>
+                  </div>
                 </div>
-                
+
+                {/* Assignment Table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="text-gray-600 border p-2">#</th>
-                        <th className="text-gray-600 border p-2">College ID</th>
-                        <th className="text-gray-600 border p-2">Student Name</th>
-                        {courseData.assignments.map((a, idx) => (
-                          <th key={a._id} className="text-gray-600 border p-2">
-                            A{idx + 1}<br/>
-                            <span className="text-gray-500 text-xs">{new Date(a.submissionDate).toLocaleDateString()}</span>
+                        <th className="border border-gray-300 p-1.5 text-left text-xs font-semibold text-gray-700">
+                          College ID
+                        </th>
+                        <th className="border border-gray-300 p-1.5 text-left text-xs font-semibold text-gray-700">
+                          Student Name
+                        </th>
+                        {courseData.assignments.map((assignment, aidx) => (
+                          <th
+                            key={assignment._id}
+                            className="border border-gray-300 p-1.5 text-center text-xs font-semibold text-gray-700"
+                          >
+                            <div>Assignment {aidx + 1}</div>
+                            <div className="text-[10px] font-normal text-gray-500">
+                              {formatDate(assignment.submissionDate)}
+                            </div>
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {reportData.students.map((student, idx) => (
-                        <tr key={student._id} className="hover:bg-gray-50">
-                          <td className="border text-gray-600 p-2 text-center">{idx + 1}</td>
-                          <td className="border text-gray-600 p-2">{student.collegeId || 'N/A'}</td>
-                          <td className="border text-gray-600 p-2">{student.name}</td>
-                          {courseData.assignments.map(assignment => {
-                            const status = getSubmissionStatus(assignment._id, student);
-                            return (
-                              <td key={assignment._id} className={`border text-gray-600 p-2 text-center ${status.class}`}>
-                                {status.text}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
+                      {studentList.map((student, idx) => {
+                        const isCR = student.role === "cr";
+                        return (
+                          <tr
+                            key={student._id}
+                            className={isCR ? "bg-blue-50" : ""}
+                          >
+                            <td className="border border-gray-300 p-1.5 text-xs text-gray-600 font-mono">
+                              {student.collegeId || "-"}
+                            </td>
+                            <td className="border border-gray-300 p-1.5 text-xs text-gray-700">
+                              {student.name}
+                              {isCR && (
+                                <span className="ml-1 text-[9px] bg-blue-200 px-1 rounded">
+                                  CR
+                                </span>
+                              )}
+                            </td>
+                            {courseData.assignments.map((assignment) => {
+                              const status = getSubmissionStatus(
+                                assignment._id,
+                                student._id,
+                              );
+                              return (
+                                <td
+                                  key={assignment._id}
+                                  className={`border border-gray-300 p-1.5 text-center text-xs ${status?.class || "status-no-submission"}`}
+                                >
+                                  {status?.text || "—"}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Footer */}
+                <div className="text-[9px] text-gray-400 text-center mt-2 pt-1 border-t border-gray-200">
+                  Assignment Submission Report - Generated on{" "}
+                  {formatDateTime(new Date())}
+                </div>
               </div>
-            ))
+            ),
           )}
         </div>
       </div>
