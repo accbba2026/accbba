@@ -630,10 +630,10 @@ const CRAttendancePage = () => {
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 border-b">
                     <tr>
-                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 sticky left-0 bg-gray-50 w-24">
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 left-0 bg-gray-50 w-24">
                         College ID
                       </th>
-                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 sticky left-24 bg-gray-50 w-32">
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 left-24 bg-gray-50 w-32">
                         Student Name
                       </th>
                       {attendanceDates.map((date) => (
@@ -667,10 +667,10 @@ const CRAttendancePage = () => {
                           key={student._id}
                           className={`hover:bg-gray-50 ${isCR ? "bg-blue-50" : ""}`}
                         >
-                          <td className="px-2 py-1.5 sticky left-0 bg-white text-xs text-gray-600 font-mono">
+                          <td className="px-2 py-1.5 left-0 bg-white text-xs text-gray-600 font-mono">
                             {student.collegeId}
                           </td>
-                          <td className="px-2 py-1.5 sticky left-24 bg-white text-xs text-gray-800 font-medium">
+                          <td className="px-2 py-1.5 left-24 bg-white text-xs text-gray-800 font-medium">
                             {student.name}
                             {isCR && (
                               <span className="ml-1 text-[9px] bg-blue-200 text-blue-700 px-1 rounded">
