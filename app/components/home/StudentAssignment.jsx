@@ -27,6 +27,7 @@ const StudentAssignment = () => {
   const [checkingSubmission, setCheckingSubmission] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("all");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const studentSemester = user?.semester || "1st";
 
@@ -123,7 +124,7 @@ const StudentAssignment = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/student/assignments?semester=${studentSemester}`
+        `/api/student/assignments?semester=${studentSemester}`,
       );
       if (!response.ok) throw new Error("Failed to fetch assignments");
 
@@ -144,7 +145,7 @@ const StudentAssignment = () => {
     setCheckingSubmission((prev) => ({ ...prev, [assignmentId]: true }));
     try {
       const response = await fetch(
-        `/api/student/assignment-submitted?assignmentId=${assignmentId}`
+        `/api/student/assignment-submitted?assignmentId=${assignmentId}`,
       );
       if (!response.ok) throw new Error("Failed to check submission");
 
@@ -180,7 +181,7 @@ const StudentAssignment = () => {
 
     try {
       const response = await fetch(
-        `/api/student/assignments/submissions?assignmentId=${assignmentId}`
+        `/api/student/assignments/submissions?assignmentId=${assignmentId}`,
       );
       if (!response.ok) throw new Error("Failed to fetch submissions");
 
@@ -284,7 +285,7 @@ const StudentAssignment = () => {
           name: a.course?.courseName,
           code: a.course?.courseCode,
         },
-      ])
+      ]),
     ).values(),
   ];
 
@@ -292,16 +293,20 @@ const StudentAssignment = () => {
   const filteredAssignments = assignments.filter((assignment) => {
     const matchesSearch =
       assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.course?.courseName?.toLowerCase().includes(
-        searchTerm.toLowerCase()
-      );
+      assignment.course?.courseName
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase());
     const matchesCourse =
       selectedCourse === "all" || assignment.course?._id === selectedCourse;
     return matchesSearch && matchesCourse;
   });
 
+  if (!user || user?.role === "faculty" || user?.role === "admin") {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header Section */}
         <div className="mb-8">
@@ -334,45 +339,73 @@ const StudentAssignment = () => {
           </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <FiFilter className="text-gray-500" />
-            <h3 className="font-semibold text-gray-900">Filter Assignments</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                <FiSearch className="text-gray-400" />
-                Search
-              </label>
-              <input
-                type="text"
-                placeholder="Search by assignment name or course..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-              />
+        {/* Filters Section - Collapsible */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+          {/* Filter Header - Clickable to toggle */}
+          <button
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <FiFilter className="text-gray-500" />
+              <h3 className="font-semibold text-gray-900">
+                Filter Assignments
+              </h3>
+              {!isFilterOpen && (
+                <span className="text-xs text-gray-400 ml-2">
+                  (
+                  {searchTerm || selectedCourse !== "all"
+                    ? "Active filters"
+                    : "No filters applied"}
+                  )
+                </span>
+              )}
             </div>
-            <div>
-              <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                <FiBookOpen className="text-gray-400" />
-                Course
-              </label>
-              <select
-                value={selectedCourse}
-                onChange={(e) => setSelectedCourse(e.target.value)}
-                className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-              >
-                <option value="all">All Courses</option>
-                {filterCourses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name} ({course.code})
-                  </option>
-                ))}
-              </select>
+            {isFilterOpen ? (
+              <FiChevronUp size={20} className="text-gray-500" />
+            ) : (
+              <FiChevronDown size={20} className="text-gray-500" />
+            )}
+          </button>
+
+          {/* Filter Content - Collapsible */}
+          {isFilterOpen && (
+            <div className="p-5 pt-0 border-t border-gray-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                    <FiSearch className="text-gray-400" />
+                    Search
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Search by assignment name or course..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                    <FiBookOpen className="text-gray-400" />
+                    Course
+                  </label>
+                  <select
+                    value={selectedCourse}
+                    onChange={(e) => setSelectedCourse(e.target.value)}
+                    className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                  >
+                    <option value="all">All Courses</option>
+                    {filterCourses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.name} ({course.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Assignments Grid */}
@@ -385,7 +418,9 @@ const StudentAssignment = () => {
           ) : filteredAssignments.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
               <FiFileText className="text-5xl text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No assignments found for your semester</p>
+              <p className="text-gray-500">
+                No assignments found for your semester
+              </p>
               {(searchTerm || selectedCourse !== "all") && (
                 <button
                   onClick={() => {
@@ -403,8 +438,12 @@ const StudentAssignment = () => {
               const isExpanded = expandedAssignments[assignment._id];
               const submissionStatus = getSubmissionStatusText(assignment._id);
               const isChecking = checkingSubmission[assignment._id];
-              const deadlineStatus = getDeadlineStatus(assignment.submissionDate);
-              const courseStyle = courseColorMap.get(assignment.course?._id) || {
+              const deadlineStatus = getDeadlineStatus(
+                assignment.submissionDate,
+              );
+              const courseStyle = courseColorMap.get(
+                assignment.course?._id,
+              ) || {
                 bg: "bg-gradient-to-br from-gray-50 to-gray-100",
                 border: "border-gray-200",
                 hover: "hover:shadow-gray-100",
@@ -412,7 +451,8 @@ const StudentAssignment = () => {
                 icon: "text-gray-600",
               };
 
-              const allSubmissions = window.allSubmissions?.[assignment._id] || [];
+              const allSubmissions =
+                window.allSubmissions?.[assignment._id] || [];
 
               return (
                 <div
@@ -450,7 +490,9 @@ const StudentAssignment = () => {
                               </span>
                               {assignment.chapter && (
                                 <>
-                                  <span className="text-xs text-gray-400">•</span>
+                                  <span className="text-xs text-gray-400">
+                                    •
+                                  </span>
                                   <span
                                     className={`text-xs px-2 py-0.5 rounded-full ${courseStyle.badge}`}
                                   >
@@ -475,8 +517,8 @@ const StudentAssignment = () => {
                               submissionStatus.color === "green"
                                 ? "bg-green-100 text-green-700"
                                 : submissionStatus.color === "orange"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-red-100 text-red-700"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-red-100 text-red-700"
                             }`}
                           >
                             {submissionStatus.icon} {submissionStatus.text}
@@ -487,8 +529,8 @@ const StudentAssignment = () => {
                             deadlineStatus.color === "orange"
                               ? "bg-orange-100 text-orange-700"
                               : deadlineStatus.color === "green"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
                           }`}
                         >
                           {deadlineStatus.text}
@@ -531,7 +573,9 @@ const StudentAssignment = () => {
                         ) : (
                           <FiChevronDown size={16} />
                         )}
-                        {isExpanded ? "Hide Submissions" : "View All Submissions"}
+                        {isExpanded
+                          ? "Hide Submissions"
+                          : "View All Submissions"}
                         {!isExpanded && allSubmissions.length > 0 && (
                           <span className="ml-1 text-xs bg-gray-200 px-1.5 py-0.5 rounded-full">
                             {allSubmissions.length}
@@ -591,15 +635,17 @@ const StudentAssignment = () => {
                                     </td>
                                     <td className="px-3 py-2 font-medium text-gray-900">
                                       {sub.studentName || sub.student?.name}
-                                      {String(sub.student?._id || sub.student) ===
-                                        String(user?._id) && (
+                                      {String(
+                                        sub.student?._id || sub.student,
+                                      ) === String(user?._id) && (
                                         <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
                                           You
                                         </span>
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-gray-600 font-mono text-xs">
-                                      {sub.studentCollegeId || sub.student?.collegeId}
+                                      {sub.studentCollegeId ||
+                                        sub.student?.collegeId}
                                     </td>
                                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                                       {sub.submittedAt
@@ -614,7 +660,9 @@ const StudentAssignment = () => {
                                             : "bg-red-100 text-red-700"
                                         }`}
                                       >
-                                        {sub.status === "onTime" ? "On Time" : "Late"}
+                                        {sub.status === "onTime"
+                                          ? "On Time"
+                                          : "Late"}
                                       </span>
                                     </td>
                                   </tr>

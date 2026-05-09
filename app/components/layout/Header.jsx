@@ -91,7 +91,7 @@ const Header = () => {
               </p>
               <button
                 onClick={logout}
-                className="text-xs text-red-500 hover:text-red-700 mt-1 transition-colors flex items-center gap-1 ml-auto"
+                className="text-xs cursor-pointer text-red-500 hover:text-red-700 mt-1 transition-colors flex items-center gap-1 ml-auto"
               >
                 <FiLogOut size={12} /> Logout
               </button>

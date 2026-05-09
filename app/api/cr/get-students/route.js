@@ -30,7 +30,7 @@ export async function GET(request) {
     
     const students = await User.find(query)
       .select('name collegeId phone email semester role')
-      .sort({ name: 1 });
+      .sort({ collegeId: 1 });
     
     // Mark the CR in the list for special handling
     const studentsWithFlag = students.map(student => ({
