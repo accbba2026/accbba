@@ -71,11 +71,8 @@ const MyAttendance = () => {
     try {
       // Remove date range parameters - just fetch by studentId and semester
       const url = `/api/student/attendance?studentId=${studentId}&semester=${studentSemester}`;
-
-      console.log("Fetching attendance from:", url);
       const response = await fetch(url);
       const data = await response.json();
-      console.log("API Response:", data);
 
       if (data.success) {
         setAttendanceData(data.data || {});
@@ -83,7 +80,6 @@ const MyAttendance = () => {
           (a, b) => new Date(a) - new Date(b),
         );
         setAttendanceDates(sortedDates);
-        console.log(`Loaded ${sortedDates.length} class dates`);
       } else {
         setError(data.message || "Failed to load attendance data");
         setAttendanceData({});
@@ -272,6 +268,9 @@ const MyAttendance = () => {
               <FiCalendar className="text-xl text-white" />
               <div>
                 <h2 className="text-lg font-bold text-white">My Attendance</h2>
+                <p className="text-blue-100 text-xs">
+                  {studentName}
+                </p>
                 <p className="text-blue-100 text-xs">
                   {studentSemester} Semester
                 </p>

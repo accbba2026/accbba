@@ -36,71 +36,71 @@ const StudentAssignment = () => {
     const colorMap = new Map();
     const courseColors = [
       {
-        bg: "bg-gradient-to-br from-blue-50 to-blue-100",
-        border: "border-blue-200",
+        bg: "bg-gradient-to-br from-blue-200 to-blue-500",
+        border: "border-blue-400",
         hover: "hover:shadow-blue-200",
         badge: "bg-blue-100 text-blue-700",
         icon: "text-blue-600",
       },
       {
-        bg: "bg-gradient-to-br from-green-50 to-green-100",
-        border: "border-green-200",
+        bg: "bg-gradient-to-br from-green-200 to-green-500",
+        border: "border-green-400",
         hover: "hover:shadow-green-200",
         badge: "bg-green-100 text-green-700",
         icon: "text-green-600",
       },
       {
-        bg: "bg-gradient-to-br from-purple-50 to-purple-100",
-        border: "border-purple-200",
+        bg: "bg-gradient-to-br from-purple-200 to-purple-500",
+        border: "border-purple-400",
         hover: "hover:shadow-purple-200",
         badge: "bg-purple-100 text-purple-700",
         icon: "text-purple-600",
       },
       {
-        bg: "bg-gradient-to-br from-orange-50 to-orange-100",
-        border: "border-orange-200",
+        bg: "bg-gradient-to-br from-orange-200 to-orange-500",
+        border: "border-orange-400",
         hover: "hover:shadow-orange-200",
         badge: "bg-orange-100 text-orange-700",
         icon: "text-orange-600",
       },
       {
-        bg: "bg-gradient-to-br from-pink-50 to-pink-100",
-        border: "border-pink-200",
+        bg: "bg-gradient-to-br from-pink-200 to-pink-500",
+        border: "border-pink-400",
         hover: "hover:shadow-pink-200",
         badge: "bg-pink-100 text-pink-700",
         icon: "text-pink-600",
       },
       {
-        bg: "bg-gradient-to-br from-indigo-50 to-indigo-100",
-        border: "border-indigo-200",
+        bg: "bg-gradient-to-br from-indigo-200 to-indigo-500",
+        border: "border-indigo-400",
         hover: "hover:shadow-indigo-200",
         badge: "bg-indigo-100 text-indigo-700",
         icon: "text-indigo-600",
       },
       {
-        bg: "bg-gradient-to-br from-teal-50 to-teal-100",
-        border: "border-teal-200",
+        bg: "bg-gradient-to-br from-teal-200 to-teal-500",
+        border: "border-teal-400",
         hover: "hover:shadow-teal-200",
         badge: "bg-teal-100 text-teal-700",
         icon: "text-teal-600",
       },
       {
-        bg: "bg-gradient-to-br from-yellow-50 to-yellow-100",
-        border: "border-yellow-200",
+        bg: "bg-gradient-to-br from-yellow-200 to-yellow-500",
+        border: "border-yellow-400",
         hover: "hover:shadow-yellow-200",
         badge: "bg-yellow-100 text-yellow-700",
         icon: "text-yellow-600",
       },
       {
-        bg: "bg-gradient-to-br from-red-50 to-red-100",
-        border: "border-red-200",
+        bg: "bg-gradient-to-br from-red-200 to-red-500",
+        border: "border-red-400",
         hover: "hover:shadow-red-200",
         badge: "bg-red-100 text-red-700",
         icon: "text-red-600",
       },
       {
-        bg: "bg-gradient-to-br from-cyan-50 to-cyan-100",
-        border: "border-cyan-200",
+        bg: "bg-gradient-to-br from-cyan-200 to-cyan-500",
+        border: "border-cyan-400",
         hover: "hover:shadow-cyan-200",
         badge: "bg-cyan-100 text-cyan-700",
         icon: "text-cyan-600",
@@ -304,7 +304,6 @@ const StudentAssignment = () => {
   if (!user || user?.role === "faculty" || user?.role === "admin") {
     return null;
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -317,10 +316,10 @@ const StudentAssignment = () => {
                   <FiFileText className="text-2xl text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                  <h1 className="text-md md:text-2xl md:text-3xl font-bold text-gray-900">
                     My Assignments
                   </h1>
-                  <p className="text-gray-600 mt-1">
+                  <p className="text-gray-600 mt-1 text-xs md:text-md">
                     View and track your assignment submissions for{" "}
                     <span className="font-semibold text-blue-600">
                       {studentSemester} Semester
@@ -329,8 +328,8 @@ const StudentAssignment = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="bg-blue-50 px-4 py-2 rounded-lg">
-                  <span className="text-sm text-blue-700">
+                <div className="bg-blue-50 px-4 md:py-2 rounded-lg">
+                  <span className="text-xs md:text-sm text-blue-700">
                     Total: {filteredAssignments.length} Assignments
                   </span>
                 </div>
@@ -348,11 +347,11 @@ const StudentAssignment = () => {
           >
             <div className="flex items-center gap-2">
               <FiFilter className="text-gray-500" />
-              <h3 className="font-semibold text-gray-900">
+              <h3 className="font-semibold text-sm md:text-md text-gray-900">
                 Filter Assignments
               </h3>
               {!isFilterOpen && (
-                <span className="text-xs text-gray-400 ml-2">
+                <span className="text-xs md:text-xs text-gray-400 ml-2">
                   (
                   {searchTerm || selectedCourse !== "all"
                     ? "Active filters"
@@ -476,16 +475,16 @@ const StudentAssignment = () => {
                               href={`/student/assignments/view/${assignment._id}`}
                               className="group"
                             >
-                              <h3 className="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors break-words">
+                              <h3 className="text-sm md:text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors break-words">
                                 {assignment.title}
                               </h3>
                             </Link>
                             <div className="flex flex-wrap items-center gap-2 mt-2">
-                              <span className="text-sm text-gray-600">
+                              <span className="text-xs md:text-sm text-gray-600">
                                 {assignment.course?.courseName}
                               </span>
                               <span className="text-xs text-gray-400">•</span>
-                              <span className="text-sm font-mono text-gray-500">
+                              <span className="text-xs md:text-sm font-mono text-gray-500">
                                 {assignment.course?.courseCode}
                               </span>
                               {assignment.chapter && (
@@ -537,36 +536,26 @@ const StudentAssignment = () => {
                         </span>
                       </div>
                     </div>
-
-                    {/* Description */}
-                    {assignment.description && (
-                      <div className="mb-4">
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                          {assignment.description}
-                        </p>
-                      </div>
-                    )}
-
                     {/* Submission Date */}
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-4 p-3 bg-white/50 rounded-lg">
+                    <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-gray-600 mb-1 md:mb-4 p-3 bg-white/50 rounded-lg">
                       <FiCalendar className="flex-shrink-0 text-blue-500" />
                       <span className="font-medium">Submission Deadline:</span>
                       <span>{formatDateLong(assignment.submissionDate)}</span>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-3 pt-3 border-t border-gray-200">
+                    <div className="flex flex-wrap gap-2 md:gap-3 pt-3 border-t border-gray-200">
                       {assignment.pdfUrl && (
                         <Link
                           href={`/student/assignments/view/${assignment._id}`}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+                          className="flex text-xs md:text items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
                         >
                           <FiEye size={16} /> View Assignment
                         </Link>
                       )}
                       <button
                         onClick={() => toggleAssignment(assignment._id)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition"
+                        className="flex text-xs md:text-md items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition"
                       >
                         {isExpanded ? (
                           <FiChevronUp size={16} />
@@ -633,7 +622,7 @@ const StudentAssignment = () => {
                                     <td className="px-3 py-2 text-gray-600">
                                       {index + 1}
                                     </td>
-                                    <td className="px-3 py-2 font-medium text-gray-900">
+                                    <td className="px-3 text-xs md:text-sm py-2 font-medium text-gray-900">
                                       {sub.studentName || sub.student?.name}
                                       {String(
                                         sub.student?._id || sub.student,
@@ -643,26 +632,33 @@ const StudentAssignment = () => {
                                         </span>
                                       )}
                                     </td>
-                                    <td className="px-3 py-2 text-gray-600 font-mono text-xs">
+                                    <td className="px-3 text-xs md:text-sm py-2 text-gray-600 font-mono text-xs">
                                       {sub.studentCollegeId ||
                                         sub.student?.collegeId}
                                     </td>
-                                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                                    <td className="px-3 text-xs md:text-sm py-2 text-gray-600 whitespace-nowrap">
                                       {sub.submittedAt
                                         ? formatDateShort(sub.submittedAt)
                                         : "N/A"}
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td className="px-3 text-xs md:text-sm py-2">
                                       <span
-                                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                                          sub.status === "onTime"
-                                            ? "bg-green-100 text-green-700"
-                                            : "bg-red-100 text-red-700"
-                                        }`}
+                                        className={`inline-block text-gray-700 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap`}
                                       >
-                                        {sub.status === "onTime"
-                                          ? "On Time"
-                                          : "Late"}
+                                        {(() => {
+                                          const submittedDate = new Date(
+                                            sub.submittedAt,
+                                          );
+                                          const dueDate = new Date(
+                                            assignment?.submissionDate,
+                                          );
+                                          submittedDate.setHours(0, 0, 0, 0);
+                                          dueDate.setHours(0, 0, 0, 0);
+
+                                          return submittedDate <= dueDate
+                                            ? "✅On Time"
+                                            : "⚠️Late";
+                                        })()}
                                       </span>
                                     </td>
                                   </tr>

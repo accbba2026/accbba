@@ -1064,15 +1064,22 @@ const CRAssignmentsPage = () => {
                                       </td>
                                       <td className="px-2 sm:px-4 py-2">
                                         <span
-                                          className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                                            sub.status === "onTime"
-                                              ? "bg-green-100 text-green-700"
-                                              : "bg-red-100 text-red-700"
-                                          }`}
+                                          className={`inline-block text-xs text-gray-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap`}
                                         >
-                                          {sub.status === "onTime"
-                                            ? "On Time"
-                                            : "Late"}
+                                          {(() => {
+                                            const submittedDate = new Date(
+                                              sub.submittedAt,
+                                            );
+                                            const dueDate = new Date(
+                                              assignment?.submissionDate,
+                                            );
+                                            submittedDate.setHours(0, 0, 0, 0);
+                                            dueDate.setHours(0, 0, 0, 0);
+
+                                            return submittedDate <= dueDate
+                                              ? "✅On Time"
+                                              : "⚠️Late";
+                                          })()}
                                         </span>
                                       </td>
                                     </tr>
