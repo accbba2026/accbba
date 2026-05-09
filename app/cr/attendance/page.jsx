@@ -630,10 +630,10 @@ const CRAttendancePage = () => {
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 border-b">
                     <tr>
-                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 left-0 bg-gray-50 w-24">
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 sticky left-0 bg-gray-50 w-24">
                         College ID
                       </th>
-                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 left-24 bg-gray-50 w-32">
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 sticky left-24 bg-gray-50 w-32">
                         Student Name
                       </th>
                       {attendanceDates.map((date) => (
@@ -644,9 +644,7 @@ const CRAttendancePage = () => {
                           {formatTableDateShort(date)}
                           <div className="text-[9px] font-normal text-gray-400">
                             {new Date(date)
-                              .toLocaleDateString("en-GB", {
-                                weekday: "short",
-                              })
+                              .toLocaleDateString("en-GB", { weekday: "short" })
                               .slice(0, 2)}
                           </div>
                         </th>
@@ -669,10 +667,10 @@ const CRAttendancePage = () => {
                           key={student._id}
                           className={`hover:bg-gray-50 ${isCR ? "bg-blue-50" : ""}`}
                         >
-                          <td className="px-2 py-1.5 left-0 bg-white text-xs text-gray-600 font-mono">
+                          <td className="px-2 py-1.5 sticky left-0 bg-white text-xs text-gray-600 font-mono">
                             {student.collegeId}
                           </td>
-                          <td className="px-2 py-1.5 left-24 bg-white text-xs text-gray-800 font-medium">
+                          <td className="px-2 py-1.5 sticky left-24 bg-white text-xs text-gray-800 font-medium">
                             {student.name}
                             {isCR && (
                               <span className="ml-1 text-[9px] bg-blue-200 text-blue-700 px-1 rounded">
@@ -682,13 +680,17 @@ const CRAttendancePage = () => {
                           </td>
                           {attendanceDates.map((date) => {
                             const hasRecord = hasAttendance(date, student._id);
+                            const record = getAttendanceRecord(
+                              date,
+                              student._id,
+                            );
                             return (
                               <td
                                 key={date}
                                 className="px-1 py-1.5 text-center"
                               >
                                 {hasRecord ? (
-                                  <>
+                                  <div className="flex items-center justify-center gap-1">
                                     <span className="text-green-600 font-bold text-xs">
                                       ✅
                                     </span>
@@ -705,9 +707,11 @@ const CRAttendancePage = () => {
                                     >
                                       <FiTrash2 size={10} />
                                     </button>
-                                  </>
+                                  </div>
                                 ) : (
-                                  <span className="text-gray-300 text-[10px]"></span>
+                                  <span className="text-gray-300 text-[10px]">
+                                    —
+                                  </span>
                                 )}
                               </td>
                             );
@@ -744,7 +748,7 @@ const CRAttendancePage = () => {
                         colSpan={attendanceDates.length + 2}
                         className="px-2 py-2 text-xs text-gray-500"
                       >
-                        ✓ = Present | — = Absent
+                        ✓ = Present | — = Absent | Click 🗑️ to remove attendance
                       </td>
                     </tr>
                   </tfoot>
