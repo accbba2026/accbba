@@ -56,6 +56,8 @@ const apiPermissions = {
     "/api/user/change-password",
     "/api/student/assignments",
      "/api/student/assignment-submitted",
+     "/api/student/attendance",
+     "/api/auth/logout",
   ],
 };
 
