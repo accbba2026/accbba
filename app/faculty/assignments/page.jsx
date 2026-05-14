@@ -262,6 +262,7 @@ const FacultyAssignmentsPage = () => {
     setIsModalOpen(true);
   };
 
+  // Replace your existing openSubmissionModal function with this
   const openSubmissionModal = async (assignment) => {
     setSelectedAssignment(assignment);
 
@@ -274,7 +275,30 @@ const FacultyAssignmentsPage = () => {
     }
 
     await fetchSubmissionsForAssignment(assignment._id);
-    setSubmissionData({ studentIds: [], studentInput: "", submissionDate: "" });
+
+    // Get current date in GMT+6 (Bangladesh Time)
+    const getCurrentBangladeshTime = () => {
+      const now = new Date();
+      // Get UTC time
+      const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+      // Add 6 hours for GMT+6
+      const bangladeshTime = new Date(utcTime + 6 * 3600000);
+
+      // Format to YYYY-MM-DDThh:mm for datetime-local input
+      const year = bangladeshTime.getFullYear();
+      const month = String(bangladeshTime.getMonth() + 1).padStart(2, "0");
+      const day = String(bangladeshTime.getDate()).padStart(2, "0");
+      const hours = String(bangladeshTime.getHours()).padStart(2, "0");
+      const minutes = String(bangladeshTime.getMinutes()).padStart(2, "0");
+
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    setSubmissionData({
+      studentIds: [],
+      studentInput: "",
+      submissionDate: getCurrentBangladeshTime(),
+    });
     setShowSubmissionModal(true);
   };
 
@@ -639,6 +663,52 @@ const FacultyAssignmentsPage = () => {
     }
   };
 
+  // Delete a single submission
+  const handleDeleteSubmission = async (submissionId, assignmentId) => {
+    if (
+      !confirm(
+        "⚠️ Are you sure you want to delete this submission? This action cannot be undone!",
+      )
+    ) {
+      return;
+    }
+
+    setSubmissionsLoading((prev) => ({ ...prev, [assignmentId]: true }));
+
+    try {
+      const response = await fetch(
+        `/api/faculty/assignments/submissions/delete?id=${submissionId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setMessage({
+          type: "success",
+          text: "Submission deleted successfully!",
+        });
+
+        // Refresh submissions for this assignment
+        await fetchSubmissionsForAssignment(assignmentId);
+
+        // Refresh assignments to update totalSubmissions count
+        fetchData();
+
+        setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      showError(error);
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+    } finally {
+      setSubmissionsLoading((prev) => ({ ...prev, [assignmentId]: false }));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -885,6 +955,9 @@ const FacultyAssignmentsPage = () => {
                                   <th className="px-4 py-2 text-left text-gray-600">
                                     Status
                                   </th>
+                                  <th className="px-4 py-2 text-left text-gray-600">
+                                    Actions
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -927,6 +1000,23 @@ const FacultyAssignmentsPage = () => {
                                         >
                                           {status.text}
                                         </span>
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <button
+                                          onClick={() =>
+                                            handleDeleteSubmission(
+                                              sub._id,
+                                              assignment._id,
+                                            )
+                                          }
+                                          className="p-1 text-red-600 hover:bg-red-50 rounded transition"
+                                          title="Delete Submission"
+                                          disabled={
+                                            submissionsLoading[assignment._id]
+                                          }
+                                        >
+                                          <FiTrash2 size={16} />
+                                        </button>
                                       </td>
                                     </tr>
                                   );
@@ -1121,7 +1211,9 @@ const FacultyAssignmentsPage = () => {
                   <p className="text-xs sm:text-sm text-yellow-800 flex items-center gap-2">
                     <FiAlertCircle className="flex-shrink-0" />
                     <span>
-                      {"Submissions will be marked as 'Late' if the submission date is after the due date."}
+                      {
+                        "Submissions will be marked as 'Late' if the submission date is after the due date."
+                      }
                     </span>
                   </p>
                 </div>

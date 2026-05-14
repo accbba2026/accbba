@@ -1,5 +1,4 @@
-// app/api/cr/assignments/update/route.js
-
+// app/api/faculty/assignments/update/route.js
 import { connectToDatabase } from '@/app/lib/mongodb';
 import Assignment from '@/app/models/Assignment';
 import Course from '@/app/models/Course';
@@ -11,22 +10,29 @@ export async function PUT(request) {
     await connectToDatabase();
     const currentUser = await getCurrentUser();
     
-    if (!currentUser || currentUser.role !== 'cr') {
+    // Faculty or Admin can update assignments
+    if (!currentUser || (currentUser.role !== 'faculty' && currentUser.role !== 'admin')) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 });
     }
     
     const { id, ...updateData } = await request.json();
+    
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Assignment ID is required' }, { status: 400 });
+    }
     
     const assignment = await Assignment.findById(id);
     if (!assignment) {
       return NextResponse.json({ success: false, message: 'Assignment not found' }, { status: 404 });
     }
     
-    // Verify assignment belongs to CR's semester
-    if (assignment.semester !== currentUser.semester) {
-      return NextResponse.json({ success: false, message: 'You can only edit assignments from your semester' }, { status: 403 });
-    }
+    // Optional: Verify faculty can only edit their own assignments
+    // Uncomment if you want to restrict faculty to only edit their own assignments
+    // if (currentUser.role === 'faculty' && assignment.teacher !== currentUser.id) {
+    //   return NextResponse.json({ success: false, message: 'You can only edit your own assignments' }, { status: 403 });
+    // }
     
+    // If course is being updated, fetch the course details
     if (updateData.course) {
       const courseData = await Course.findById(updateData.course);
       if (courseData) {
@@ -49,7 +55,16 @@ export async function PUT(request) {
       delete updateData.pdfFileSize;
     }
     
-    const updatedAssignment = await Assignment.findByIdAndUpdate(id, updateData, { new: true });
+    // Remove teacher field if present to prevent unauthorized teacher changes
+    if (updateData.teacher) {
+      delete updateData.teacher;
+    }
+    
+    const updatedAssignment = await Assignment.findByIdAndUpdate(
+      id, 
+      updateData, 
+      { new: true, runValidators: true }
+    );
     
     return NextResponse.json({ success: true, data: updatedAssignment });
   } catch (error) {

@@ -597,7 +597,7 @@ const AttendancePage = () => {
                         <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 left-0 bg-gray-50 w-24">
                           College ID
                         </th>
-                        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700 left-24 bg-gray-50 w-32">
+                        <th className="px-2 py-2 text-center text-xs font-semibold text-gray-700 left-24 bg-gray-50 w-32">
                           Student Name
                         </th>
                         {attendanceDates.map((date) => (
@@ -632,7 +632,7 @@ const AttendancePage = () => {
                             <td className="px-2 py-1.5 left-0 bg-white text-xs text-gray-600 font-mono">
                               {student.collegeId}
                             </td>
-                            <td className="px-2 py-1.5 left-24 bg-white text-xs text-gray-800 font-medium">
+                            <td className="px-2 py-1.5 text-left left-24 bg-white text-xs text-gray-800 font-medium">
                               {student.name}
                             </td>
                             {attendanceDates.map((date) => {

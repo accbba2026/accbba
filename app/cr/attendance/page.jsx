@@ -15,6 +15,7 @@ import {
   FiPrinter,
 } from "react-icons/fi";
 import { FaUserCheck } from "react-icons/fa";
+import { TiTick } from "react-icons/ti";
 
 const CRAttendancePage = () => {
   const { user } = useAuth();
@@ -125,12 +126,6 @@ const CRAttendancePage = () => {
     setEndDate(end);
     setDateRangeMode(false);
     fetchAttendanceWithRange(userSemester, start, end);
-  };
-
-  // Handle date selection from date picker
-  const handleDateSelect = (e) => {
-    const dateValue = e.target.value;
-    setSelectedDate(dateValue);
   };
 
   // Fetch students for the semester
@@ -351,148 +346,118 @@ const CRAttendancePage = () => {
   };
 
   // Print attendance report
+  // Print attendance report - Simple mobile-friendly version
   const handlePrint = () => {
-    const printContent = document.getElementById(
-      "attendance-print-area",
-    ).innerHTML;
+    // Add a class to hide non-print elements
+    const originalTitle = document.title;
+    document.title = `Attendance Report - ${userSemester} Semester`;
 
+    // Get the print area
+    const printArea = document.getElementById("attendance-print-area");
+    const originalContent = document.body.innerHTML;
+
+    // Create print-friendly HTML
     const dateRangeText = `${formatToDDMMYYYY(startDate)} to ${formatToDDMMYYYY(endDate)}`;
     const generatedDate = new Date().toLocaleString();
 
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Attendance Report - ${userSemester} Semester</title>
-        <meta charset="UTF-8">
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
+    const printHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Attendance Report - ${userSemester} Semester</title>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          margin: 0;
+        }
+        .print-header {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        .print-header h1 {
+          font-size: 24px;
+          margin: 0;
+        }
+        .print-header h2 {
+          font-size: 18px;
+          margin: 10px 0;
+          color: #555;
+        }
+        .print-header p {
+          font-size: 14px;
+          margin: 5px 0;
+          color: #777;
+        }
+        table {
+          border-collapse: collapse;
+          width: 100%;
+          font-size: 12px;
+        }
+        th, td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: center;
+        }
+        th {
+          background-color: #f5f5f5;
+          font-weight: bold;
+        }
+        .print-footer {
+          margin-top: 20px;
+          text-align: center;
+          font-size: 11px;
+          color: #888;
+        }
+        @media print {
           body {
-            font-family: Arial, Helvetica, sans-serif;
-            padding: 10px;
-            background: white;
+            padding: 0;
           }
-          
-          @media print {
-            @page {
-              size: A4 landscape;
-              margin: 0.3cm;
-              }
-              .print-hide {
-              display: none !important;
-              }
-            
-            body {
-              padding: 0;
-              margin: 0;
-            }
-            
-            .print-header {
-              margin-bottom: 15px;
-              text-align: center;
-            }
-            
-            .print-header h1 {
-              font-size: 14pt;
-              margin: 0;
-            }
-            
-            .print-header h2 {
-              font-size: 12pt;
-              margin: 5px 0;
-            }
-            
-            table {
-              font-size: 7pt;
-            }
-            
-            th, td {
-              padding: 2px 3px;
-            }
+          button, .no-print {
+            display: none;
           }
-          
-          .print-header {
-            margin-bottom: 20px;
-            text-align: center;
-          }
-          
-          .print-header h1 {
-            font-size: 18px;
-            margin: 0;
-          }
-          
-          .print-header h2 {
-            font-size: 16px;
-            margin: 5px 0;
-            color: #555;
-          }
-          
-          .print-header p {
-            font-size: 12px;
-            margin: 3px 0;
-            color: #777;
-          }
-          
-          table {
-            border-collapse: collapse;
-            width: 100%;
-            font-size: 10px;
-          }
-          
-          th, td {
-            border: 1px solid #ddd;
-            padding: 4px 6px;
-            text-align: center;
-          }
-          
-          th {
-            background-color: #f5f5f5;
-            font-weight: bold;
-          }
-          
-          .text-left {
-            text-align: left;
-          }
-          
-          .print-footer {
-            margin-top: 15px;
-            font-size: 9px;
-            text-align: center;
-            color: #888;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="print-header">
-          <h1>ATTENDANCE REPORT</h1>
-          <h2>${userSemester} Semester</h2>
-          <p>Period: ${dateRangeText}</p>
-          <p>Generated on: ${generatedDate}</p>
-        </div>
-        
-        ${printContent}
-        
-        <div class="print-footer">
-          <p>This is a system generated report. Valid with digital signature.</p>
-        </div>
-      </body>
-      </html>
-    `);
+        }
+      </style>
+    </head>
+    <body>
+      <div class="print-header">
+        <h1>ATTENDANCE REPORT</h1>
+        <h2>${userSemester} Semester</h2>
+        <p>Period: ${dateRangeText}</p>
+        <p>Generated on: ${generatedDate}</p>
+      </div>
+      ${printArea.innerHTML}
+      <div class="print-footer">
+        <p>This is a system generated report. Valid with digital signature.</p>
+      </div>
+      <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px;">Print</button>
+      <button onclick="window.close()" style="margin-top: 20px; margin-left: 10px; padding: 10px 20px;">Close</button>
+    </body>
+    </html>
+  `;
 
-    printWindow.document.close();
+    // Open print window
+    const printWindow = window.open("", "_blank", "width=800,height=600");
 
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.onafterprint = () => {
-        printWindow.close();
+    if (printWindow) {
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+
+      // Auto-trigger print after content loads
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
       };
-    };
+    } else {
+      // If popup is blocked, show message
+      alert(
+        "Please allow popups for this website to print the report. Alternatively, you can use Ctrl+P (Cmd+P on Mac) to print this page.",
+      );
+    }
   };
 
   return (
@@ -691,8 +656,8 @@ const CRAttendancePage = () => {
                               >
                                 {hasRecord ? (
                                   <div className="flex items-center justify-center gap-1">
-                                    <span className="text-green-600 font-bold text-xs">
-                                      ✅
+                                    <span className="text-green-600 font-bold text-md">
+                                      <TiTick/>
                                     </span>
                                     <button
                                       onClick={() =>
@@ -710,7 +675,7 @@ const CRAttendancePage = () => {
                                   </div>
                                 ) : (
                                   <span className="text-gray-300 text-[10px]">
-                                    —
+                                    
                                   </span>
                                 )}
                               </td>
@@ -806,23 +771,20 @@ const CRAttendancePage = () => {
               </div>
 
               <form onSubmit={handleSubmitAttendance} className="p-6 space-y-4">
-                {/* Date Selection */}
+                {/* Date Display - Today's Date (Auto Set) */}
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium">
                     Date <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={handleDateSelect}
-                    required
-                    className="w-full text-gray-600 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  />
-                  {selectedDate && (
-                    <p className="text-xs text-green-600 mt-1">
-                      Selected: {formatToDDMMYYYY(selectedDate)}
-                    </p>
-                  )}
+                  <div className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
+                    {formatToDDMMYYYY(selectedDate)}
+                    <span className="text-xs text-gray-500 ml-2">
+                      (Today's date - automatically set)
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Attendance is automatically recorded for today's date
+                  </p>
                 </div>
 
                 {/* Add by College ID */}

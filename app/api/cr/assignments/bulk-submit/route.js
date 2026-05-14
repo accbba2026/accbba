@@ -47,6 +47,7 @@ export async function POST(request) {
       _id: { $in: studentIds },
       $or: [
         { role: 'student' },
+        { role: 'cr' },
         { role: 'cr', _id: currentUser._id }
       ],
       semester: currentUser.semester

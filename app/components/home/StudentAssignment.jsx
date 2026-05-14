@@ -221,12 +221,8 @@ const StudentAssignment = () => {
     const statusData = submissionStatusMap[assignmentId];
     if (!statusData || !statusData.submitted) {
       return { text: "Not Submitted", color: "red", icon: "❌" };
-    }
-
-    if (statusData.status === "On Time") {
-      return { text: "Submitted", color: "green", icon: "✅" };
     } else {
-      return { text: "Late", color: "orange", icon: "⚠️" };
+      return { text: "Submitted", color: "green", icon: "✅" };
     }
   };
 
@@ -534,6 +530,14 @@ const StudentAssignment = () => {
                         >
                           {deadlineStatus.text}
                         </span>
+                        {deadlineStatus.text === "Expired" &&
+                          submissionStatus.text === "Not Submitted" && (
+                            <span
+                              className={`px-3 py-1 text-xs font-semibold whitespace-nowrap text-green-700`}
+                            >
+                              You can still submit
+                            </span>
+                          )}
                       </div>
                     </div>
                     {/* Submission Date */}
