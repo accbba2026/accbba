@@ -7,7 +7,7 @@ import {
   FaTasks, 
   FaCalendarCheck,
   FaChalkboardTeacher,
-  FaUserTie
+  FaHistory
 } from "react-icons/fa";
 
 const Page = () => {
@@ -109,6 +109,19 @@ const Page = () => {
                   <FaChalkboardTeacher className="text-white text-3xl mb-3" />
                   <h3 className="text-white font-semibold text-lg">Courses</h3>
                   <p className="text-white/80 text-sm mt-1">Manage courses</p>
+                </div>
+              </Link>
+              {/* Logs Tab */}
+              <Link
+                href="/admin/logs"
+                className="group relative overflow-hidden bg-gradient-to-br from-lime-500 to-lime-500 rounded-xl p-6 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mt-10 -mr-10"></div>
+                <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full -mb-10 -ml-10"></div>
+                <div className="relative z-10">
+                  <FaHistory className="text-white text-3xl mb-3" />
+                  <h3 className="text-white font-semibold text-lg">Logs</h3>
+                  <p className="text-white/80 text-sm mt-1">View system logs</p>
                 </div>
               </Link>
             </div>

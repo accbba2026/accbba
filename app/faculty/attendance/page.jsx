@@ -15,6 +15,7 @@ import {
   FiPrinter,
 } from "react-icons/fi";
 import { FaUserCheck } from "react-icons/fa";
+import { TiTick } from "react-icons/ti";
 
 const AttendancePage = () => {
   const { user } = useAuth();
@@ -753,8 +754,8 @@ const AttendancePage = () => {
                                 >
                                   {hasRecord ? (
                                     <div className="flex items-center justify-center gap-1">
-                                      <span className="text-green-600 font-bold text-xs">
-                                        ✅
+                                      <span className="text-green-600 font-bold text-md">
+                                        <TiTick/>
                                       </span>
                                       <button
                                         onClick={() =>

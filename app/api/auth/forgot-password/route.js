@@ -18,8 +18,7 @@ export async function POST(request) {
     await connectToDatabase();
     
     const { email, collegeId, loginType } = await request.json();
-    
-    console.log('📨 Forgot password request:', { loginType, email, collegeId });
+
     
     let user = null;
     let identifier = null;
@@ -39,9 +38,6 @@ export async function POST(request) {
         { status: 404 }
       );
     }
-    
-    console.log(`✅ User found: ${user.name} (${user.email})`);
-    console.log(`🔑 Identifier for OTP: ${identifier}`);
     
     // Generate OTP
     const otp = generateAndStoreOTP(identifier);
@@ -83,7 +79,6 @@ export async function POST(request) {
       `,
     });
     
-    console.log(`📧 Email sent to ${user.email} with OTP: ${otp}`);
     
     return NextResponse.json({
       success: true,
