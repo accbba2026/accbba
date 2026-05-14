@@ -365,7 +365,7 @@ const AttendancePage = () => {
     );
   };
 
-  // Print attendance report
+  // Print attendance report - Mobile-friendly version
   const handlePrint = () => {
     const printContent = document.getElementById(
       "attendance-print-area",
@@ -373,57 +373,159 @@ const AttendancePage = () => {
     const dateRangeText = `${formatToDDMMYYYY(startDate)} to ${formatToDDMMYYYY(endDate)}`;
     const generatedDate = new Date().toLocaleString();
 
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Attendance Report - ${selectedSemester} Semester</title>
-        <meta charset="UTF-8">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, Helvetica, sans-serif; padding: 10px; background: white; }
-          @media print {
-            @page { size: A4 landscape; margin: 0.3cm; }
-            body { padding: 0; margin: 0; }
-            .print-header { margin-bottom: 15px; text-align: center; }
-            .print-header h1 { font-size: 14pt; margin: 0; }
-            .print-header h2 { font-size: 12pt; margin: 5px 0; }
-            table { font-size: 7pt; }
-            th, td { padding: 2px 3px; }
-            .print-hide {
+    const printHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Attendance Report - ${selectedSemester} Semester</title>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { 
+          margin: 0; 
+          padding: 0; 
+          box-sizing: border-box; 
+        }
+        
+        body { 
+          font-family: Arial, Helvetica, sans-serif; 
+          padding: 10px; 
+          background: white; 
+        }
+        
+        @media print {
+          @page { 
+            size: A4 landscape; 
+            margin: 0.3cm; 
+          }
+          .print-hide {
             display: none !important;
           }
+          body { 
+            padding: 0; 
+            margin: 0; 
           }
-          .print-header { margin-bottom: 20px; text-align: center; }
-          .print-header h1 { font-size: 18px; margin: 0; }
-          .print-header h2 { font-size: 16px; margin: 5px 0; color: #555; }
-          .print-header p { font-size: 12px; margin: 3px 0; color: #777; }
-          table { border-collapse: collapse; width: 100%; font-size: 10px; }
-          th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: center; }
-          th { background-color: #f5f5f5; font-weight: bold; }
-          .text-left { text-align: left; }
-          .print-footer { margin-top: 15px; font-size: 9px; text-align: center; color: #888; }
-        </style>
-      </head>
-      <body>
-        <div class="print-header">
-          <h1>ATTENDANCE REPORT</h1>
-          <h2>${selectedSemester} Semester</h2>
-          <p>Period: ${dateRangeText}</p>
-          <p>Generated on: ${generatedDate}</p>
-        </div>
-        ${printContent}
-        <div class="print-footer">
-          <p>This is a system generated report. Valid with digital signature.</p>
-        </div>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.onafterprint = () => printWindow.close();
+          .print-header { 
+            margin-bottom: 15px; 
+            text-align: center; 
+          }
+          .print-header h1 { 
+            font-size: 14pt; 
+            margin: 0; 
+          }
+          .print-header h2 { 
+            font-size: 12pt; 
+            margin: 5px 0; 
+          }
+          table { 
+            font-size: 7pt; 
+          }
+          th, td { 
+            padding: 2px 3px; 
+          }
+        }
+        
+        .print-header { 
+          margin-bottom: 20px; 
+          text-align: center; 
+        }
+        .print-header h1 { 
+          font-size: 18px; 
+          margin: 0; 
+        }
+        .print-header h2 { 
+          font-size: 16px; 
+          margin: 5px 0; 
+          color: #555; 
+        }
+        .print-header p { 
+          font-size: 12px; 
+          margin: 3px 0; 
+          color: #777; 
+        }
+        table { 
+          border-collapse: collapse; 
+          width: 100%; 
+          font-size: 10px; 
+        }
+        th, td { 
+          border: 1px solid #ddd; 
+          padding: 4px 6px; 
+          text-align: center; 
+        }
+        th { 
+          background-color: #f5f5f5; 
+          font-weight: bold; 
+        }
+        .text-left { 
+          text-align: left; 
+        }
+        .print-footer { 
+          margin-top: 15px; 
+          font-size: 9px; 
+          text-align: center; 
+          color: #888; 
+        }
+      </style>
+    </head>
+    <body>
+      <div class="print-header">
+        <h1>ATTENDANCE REPORT</h1>
+        <h2>${selectedSemester} Semester</h2>
+        <p>Period: ${dateRangeText}</p>
+        <p>Generated on: ${generatedDate}</p>
+      </div>
+      ${printContent}
+      <div class="print-footer">
+        <p>This is a system generated report. Valid with digital signature.</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+    // Use iframe approach for better mobile compatibility
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "absolute";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(printHtml);
+    iframeDoc.close();
+
+    iframe.contentWindow.onload = () => {
+      try {
+        iframe.contentWindow.print();
+      } catch (e) {
+        console.error("Print failed:", e);
+        // Fallback: open in new window
+        const printWindow = window.open("", "_blank");
+        if (printWindow) {
+          printWindow.document.write(printHtml);
+          printWindow.document.close();
+          printWindow.onload = () => {
+            printWindow.print();
+            printWindow.onafterprint = () => {
+              printWindow.close();
+            };
+          };
+        } else {
+          // If popup blocked, show alternative
+          alert(
+            "Please allow popups for this site to print, or use your browser's print feature (Ctrl+P / Cmd+P)",
+          );
+        }
+      } finally {
+        // Remove iframe after printing
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }
     };
   };
 
