@@ -20,9 +20,10 @@ import {
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaGraduationCap, FaUserGraduate } from "react-icons/fa";
 import { HiOutlineUserGroup } from "react-icons/hi";
+import { MdDelete } from "react-icons/md";
 
 export default function StudentManagement() {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const [students, setStudents] = useState([]);
   const [semesterStats, setSemesterStats] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,6 +66,41 @@ export default function StudentManagement() {
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [isBulkOperationsOpen, setIsBulkOperationsOpen] = useState(false);
 
+  const [deletingStudentId, setDeletingStudentId] = useState(null);
+
+  const handleDeleteStudent = async (studentId) => {
+    const isConfirmed = window.confirm(
+      "Are you sure you want to delete this student? This action cannot be undone.",
+    );
+
+    if (!isConfirmed) return;
+
+    setDeletingStudentId(studentId); // Start specific loading state
+
+    try {
+      const response = await fetch("/api/user/delete-student", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: studentId }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        window.alert("Student deleted successfully!");
+        fetchStudents();
+        fetchSemesterStats();
+      } else {
+        window.alert(data.message || "Failed to delete student.");
+      }
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      window.alert("An error occurred while trying to delete the student.");
+    } finally {
+      setDeletingStudentId(null); // Stop specific loading state
+    }
+  };
+
   // Fetch students on load
   useEffect(() => {
     //eslint-disable-next-line
@@ -75,7 +111,7 @@ export default function StudentManagement() {
 
   const fetchStudents = async () => {
     try {
-      setStudentFetchLoad(true)
+      setStudentFetchLoad(true);
       const response = await fetch("/api/user/get-students");
       const data = await response.json();
       if (data.success) {
@@ -83,8 +119,8 @@ export default function StudentManagement() {
       }
     } catch (error) {
       console.error("Error fetching students:", error);
-    } finally{
-      setStudentFetchLoad(false)
+    } finally {
+      setStudentFetchLoad(false);
     }
   };
 
@@ -850,12 +886,30 @@ export default function StudentManagement() {
                           <td className="px-4 py-3 capitalize text-gray-600">
                             {student.role}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="flex px-4 py-3">
                             <button
                               onClick={() => openEditModal(student)}
                               className="text-blue-600 hover:text-blue-800 transition flex items-center gap-1"
                             >
                               <FiEdit2 /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStudent(student._id)}
+                              disabled={deletingStudentId === student._id}
+                              className="ml-4 text-red-600 hover:text-red-800 transition flex items-center gap-1 disabled:opacity-50"
+                            >
+                              {user?.role === "admin" ? (
+                                deletingStudentId === student._id ? (
+                                  <>
+                                    <FiRefreshCw className="animate-spin" />{" "}
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <MdDelete /> Delete
+                                  </>
+                                )
+                              ) : null}
                             </button>
                           </td>
                         </tr>
@@ -874,7 +928,9 @@ export default function StudentManagement() {
             <p className="text-gray-500">
               {searchTerm
                 ? "No students match your search."
-                : studentFetchLoad ? "Loading..." : "No students found. Add your first student!"}
+                : studentFetchLoad
+                  ? "Loading..."
+                  : "No students found. Add your first student!"}
             </p>
           </div>
         )}

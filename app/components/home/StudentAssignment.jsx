@@ -3,14 +3,11 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import {
   FiFileText,
-  FiCheckCircle,
   FiClock,
-  FiAlertCircle,
   FiChevronDown,
   FiChevronUp,
   FiEye,
   FiCalendar,
-  FiBookOpen,
   FiUsers,
   FiSearch,
   FiFilter,
@@ -27,91 +24,60 @@ const StudentAssignment = () => {
   const [checkingSubmission, setCheckingSubmission] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("all");
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const studentSemester = user?.semester || "1st";
 
-  // Course color mapping - consistent colors for each course
+  // Re-implemented Course Color Mapping with 3D Claymorphism Themes
   const courseColorMap = useMemo(() => {
     const colorMap = new Map();
-    const courseColors = [
+    const courseThemes = [
       {
-        bg: "bg-gradient-to-br from-blue-200 to-blue-500",
-        border: "border-blue-400",
-        hover: "hover:shadow-blue-200",
-        badge: "bg-blue-100 text-blue-700",
-        icon: "text-blue-600",
+        // Green
+        container: "bg-[#a5dc9c] shadow-[10px_10px_20px_#8cbb84,-10px_-10px_20px_#beffb4] md:shadow-[15px_15px_30px_#8cbb84,-15px_-15px_30px_#beffb4] border-[#b4f0aa]",
+        header: "bg-[#afd8a8] shadow-[6px_6px_12px_#95b88f,-6px_-6px_12px_#c9f8c1,inset_1px_1px_2px_rgba(255,255,255,0.5)] border-white/20",
+        pill: "bg-[#a5dc9c] shadow-[inset_3px_3px_6px_#8cbb84,inset_-3px_-3px_6px_#beffb4] border-white/30 text-green-800",
+        deadline: "bg-[#b3e3aa] shadow-[inset_4px_4px_8px_#99c191,inset_-4px_-4px_8px_rgba(255,255,255,0.7)]",
+        text: "text-green-800"
       },
       {
-        bg: "bg-gradient-to-br from-green-200 to-green-500",
-        border: "border-green-400",
-        hover: "hover:shadow-green-200",
-        badge: "bg-green-100 text-green-700",
-        icon: "text-green-600",
+        // Blue
+        container: "bg-[#a5c9dc] shadow-[10px_10px_20px_#8caabf,-10px_-10px_20px_#bee8fd] md:shadow-[15px_15px_30px_#8caabf,-15px_-15px_30px_#bee8fd] border-[#b4daf0]",
+        header: "bg-[#afd1e6] shadow-[6px_6px_12px_#95b2c4,-6px_-6px_12px_#c9f0ff,inset_1px_1px_2px_rgba(255,255,255,0.5)] border-white/20",
+        pill: "bg-[#a5c9dc] shadow-[inset_3px_3px_6px_#8caabf,inset_-3px_-3px_6px_#bee8fd] border-white/30 text-blue-800",
+        deadline: "bg-[#b3d7ee] shadow-[inset_4px_4px_8px_#99b7cb,inset_-4px_-4px_8px_rgba(255,255,255,0.7)]",
+        text: "text-blue-800"
       },
       {
-        bg: "bg-gradient-to-br from-purple-200 to-purple-500",
-        border: "border-purple-400",
-        hover: "hover:shadow-purple-200",
-        badge: "bg-purple-100 text-purple-700",
-        icon: "text-purple-600",
+        // Purple
+        container: "bg-[#c5a5dc] shadow-[10px_10px_20px_#a78cbb,-10px_-10px_20px_#e3beff] md:shadow-[15px_15px_30px_#a78cbb,-15px_-15px_30px_#e3beff] border-[#d6b4f0]",
+        header: "bg-[#cbafe6] shadow-[6px_6px_12px_#ad95c4,-6px_-6px_12px_#e9c9ff,inset_1px_1px_2px_rgba(255,255,255,0.5)] border-white/20",
+        pill: "bg-[#c5a5dc] shadow-[inset_3px_3px_6px_#a78cbb,inset_-3px_-3px_6px_#e3beff] border-white/30 text-purple-800",
+        deadline: "bg-[#d3b3ee] shadow-[inset_4px_4px_8px_#b399cb,inset_-4px_-4px_8px_rgba(255,255,255,0.7)]",
+        text: "text-purple-800"
       },
       {
-        bg: "bg-gradient-to-br from-orange-200 to-orange-500",
-        border: "border-orange-400",
-        hover: "hover:shadow-orange-200",
-        badge: "bg-orange-100 text-orange-700",
-        icon: "text-orange-600",
+        // Orange
+        container: "bg-[#dcb8a5] shadow-[10px_10px_20px_#bb9c8c,-10px_-10px_20px_#fdd4be] md:shadow-[15px_15px_30px_#bb9c8c,-15px_-15px_30px_#fdd4be] border-[#f0c9b4]",
+        header: "bg-[#e6c1af] shadow-[6px_6px_12px_#c4a495,-6px_-6px_12px_#ffdec9,inset_1px_1px_2px_rgba(255,255,255,0.5)] border-white/20",
+        pill: "bg-[#dcb8a5] shadow-[inset_3px_3px_6px_#bb9c8c,inset_-3px_-3px_6px_#fdd4be] border-white/30 text-orange-800",
+        deadline: "bg-[#eec7b3] shadow-[inset_4px_4px_8px_#cba999,inset_-4px_-4px_8px_rgba(255,255,255,0.7)]",
+        text: "text-orange-800"
       },
       {
-        bg: "bg-gradient-to-br from-pink-200 to-pink-500",
-        border: "border-pink-400",
-        hover: "hover:shadow-pink-200",
-        badge: "bg-pink-100 text-pink-700",
-        icon: "text-pink-600",
-      },
-      {
-        bg: "bg-gradient-to-br from-indigo-200 to-indigo-500",
-        border: "border-indigo-400",
-        hover: "hover:shadow-indigo-200",
-        badge: "bg-indigo-100 text-indigo-700",
-        icon: "text-indigo-600",
-      },
-      {
-        bg: "bg-gradient-to-br from-teal-200 to-teal-500",
-        border: "border-teal-400",
-        hover: "hover:shadow-teal-200",
-        badge: "bg-teal-100 text-teal-700",
-        icon: "text-teal-600",
-      },
-      {
-        bg: "bg-gradient-to-br from-yellow-200 to-yellow-500",
-        border: "border-yellow-400",
-        hover: "hover:shadow-yellow-200",
-        badge: "bg-yellow-100 text-yellow-700",
-        icon: "text-yellow-600",
-      },
-      {
-        bg: "bg-gradient-to-br from-red-200 to-red-500",
-        border: "border-red-400",
-        hover: "hover:shadow-red-200",
-        badge: "bg-red-100 text-red-700",
-        icon: "text-red-600",
-      },
-      {
-        bg: "bg-gradient-to-br from-cyan-200 to-cyan-500",
-        border: "border-cyan-400",
-        hover: "hover:shadow-cyan-200",
-        badge: "bg-cyan-100 text-cyan-700",
-        icon: "text-cyan-600",
-      },
+        // Pink
+        container: "bg-[#dca5bd] shadow-[10px_10px_20px_#bb8ca1,-10px_-10px_20px_#ffbed9] md:shadow-[15px_15px_30px_#bb8ca1,-15px_-15px_30px_#ffbed9] border-[#f0b4ce]",
+        header: "bg-[#e6afd1] shadow-[6px_6px_12px_#c495b2,-6px_-6px_12px_#ffc9f0,inset_1px_1px_2px_rgba(255,255,255,0.5)] border-white/20",
+        pill: "bg-[#dca5bd] shadow-[inset_3px_3px_6px_#bb8ca1,inset_-3px_-3px_6px_#ffbed9] border-white/30 text-pink-800",
+        deadline: "bg-[#eeb3d3] shadow-[inset_4px_4px_8px_#cb99b3,inset_-4px_-4px_8px_rgba(255,255,255,0.7)]",
+        text: "text-pink-800"
+      }
     ];
 
     let colorIndex = 0;
     assignments.forEach((assignment) => {
       const courseId = assignment.course?._id;
       if (courseId && !colorMap.has(courseId)) {
-        colorMap.set(courseId, courseColors[colorIndex % courseColors.length]);
+        colorMap.set(courseId, courseThemes[colorIndex % courseThemes.length]);
         colorIndex++;
       }
     });
@@ -140,7 +106,6 @@ const StudentAssignment = () => {
     }
   };
 
-  // Check submission status for a single assignment
   const checkSubmissionStatus = async (assignmentId) => {
     setCheckingSubmission((prev) => ({ ...prev, [assignmentId]: true }));
     try {
@@ -163,18 +128,15 @@ const StudentAssignment = () => {
     }
   };
 
-  // Check submission status for all assignments
   const checkAllSubmissionsStatus = async (assignmentsList) => {
     for (const assignment of assignmentsList) {
       await checkSubmissionStatus(assignment._id);
     }
   };
 
-  // Fetch all submissions for an assignment (for the expanded view)
   const fetchAllSubmissions = async (assignmentId) => {
     //eslint-disable-next-line
     if (!window.allSubmissions) window.allSubmissions = {};
-
     if (window.allSubmissions[assignmentId]) return;
 
     setExpandedAssignments((prev) => ({ ...prev, [assignmentId]: true }));
@@ -189,7 +151,6 @@ const StudentAssignment = () => {
       if (data.success) {
         //eslint-disable-next-line
         window.allSubmissions[assignmentId] = data.data;
-        // Force re-render
         setExpandedAssignments((prev) => ({ ...prev }));
       }
     } catch (error) {
@@ -197,10 +158,8 @@ const StudentAssignment = () => {
     }
   };
 
-  // Toggle assignment expansion
   const toggleAssignment = async (assignmentId) => {
     const isExpanded = expandedAssignments[assignmentId];
-
     if (!isExpanded) {
       await fetchAllSubmissions(assignmentId);
     } else {
@@ -216,17 +175,15 @@ const StudentAssignment = () => {
     //eslint-disable-next-line
   }, [user]);
 
-  // Get submission status text from the map
   const getSubmissionStatusText = (assignmentId) => {
     const statusData = submissionStatusMap[assignmentId];
     if (!statusData || !statusData.submitted) {
-      return { text: "Not Submitted", color: "red", icon: "❌" };
+      return { text: "Late Submission Allowed", color: "red", icon: "❌" };
     } else {
       return { text: "Submitted", color: "green", icon: "✅" };
     }
   };
 
-  // Get submission deadline status
   const getDeadlineStatus = (submissionDate) => {
     if (!submissionDate) return { text: "No Date", color: "gray" };
 
@@ -255,37 +212,13 @@ const StudentAssignment = () => {
   const formatDateLong = (date) => {
     if (!date) return "N/A";
     return new Date(date).toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
       weekday: "long",
-    });
-  };
-
-  const formatDateShort = (date) => {
-    if (!date) return "N/A";
-    return new Date(date).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
   };
 
-  // Get unique courses for filter
-  const filterCourses = [
-    ...new Map(
-      assignments.map((a) => [
-        a.course?._id,
-        {
-          id: a.course?._id,
-          name: a.course?.courseName,
-          code: a.course?.courseCode,
-        },
-      ]),
-    ).values(),
-  ];
-
-  // Filter assignments
   const filteredAssignments = assignments.filter((assignment) => {
     const matchesSearch =
       assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -300,380 +233,171 @@ const StudentAssignment = () => {
   if (!user || user?.role === "faculty" || user?.role === "admin") {
     return null;
   }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="min-h-screen bg-gray-50 rounded-2xl p-4 md:p-8">
+      <div className="container mx-auto max-w-2xl">
         {/* Header Section */}
-        <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-lg">
-                  <FiFileText className="text-2xl text-white" />
-                </div>
-                <div>
-                  <h1 className="text-md md:text-2xl md:text-3xl font-bold text-gray-900">
-                    My Assignments
-                  </h1>
-                  <p className="text-gray-600 mt-1 text-xs md:text-md">
-                    View and track your assignment submissions for{" "}
-                    <span className="font-semibold text-blue-600">
-                      {studentSemester} Semester
-                    </span>
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="bg-blue-50 px-4 md:py-2 rounded-lg">
-                  <span className="text-xs md:text-sm text-blue-700">
-                    Total: {filteredAssignments.length} Assignments
-                  </span>
-                </div>
-              </div>
+        <div className="mb-8 bg-white rounded-3xl shadow-sm border border-gray-100 p-5 md:p-6">
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 md:p-3 rounded-2xl shadow-lg">
+              <FiFileText className="text-xl md:text-2xl text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                My Assignments
+              </h1>
+              <p className="text-gray-500 text-xs md:text-sm mt-1">
+                {studentSemester} Semester • {filteredAssignments.length} Total
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Filters Section - Collapsible */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
-          {/* Filter Header - Clickable to toggle */}
-          <button
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <FiFilter className="text-gray-500" />
-              <h3 className="font-semibold text-sm md:text-md text-gray-900">
-                Filter Assignments
-              </h3>
-              {!isFilterOpen && (
-                <span className="text-xs md:text-xs text-gray-400 ml-2">
-                  (
-                  {searchTerm || selectedCourse !== "all"
-                    ? "Active filters"
-                    : "No filters applied"}
-                  )
-                </span>
-              )}
-            </div>
-            {isFilterOpen ? (
-              <FiChevronUp size={20} className="text-gray-500" />
-            ) : (
-              <FiChevronDown size={20} className="text-gray-500" />
-            )}
-          </button>
-
-          {/* Filter Content - Collapsible */}
-          {isFilterOpen && (
-            <div className="p-5 pt-0 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                    <FiSearch className="text-gray-400" />
-                    Search
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Search by assignment name or course..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                    <FiBookOpen className="text-gray-400" />
-                    Course
-                  </label>
-                  <select
-                    value={selectedCourse}
-                    onChange={(e) => setSelectedCourse(e.target.value)}
-                    className="w-full text-gray-600 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                  >
-                    <option value="all">All Courses</option>
-                    {filterCourses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.name} ({course.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Assignments Grid */}
-        <div className="grid grid-cols-1 gap-6">
+        {/* Assignments List */}
+        <div className="flex flex-col gap-8 md:gap-10">
           {loading ? (
-            <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-gray-500 mt-4">Loading assignments...</p>
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-blue-600 mx-auto"></div>
             </div>
           ) : filteredAssignments.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
-              <FiFileText className="text-5xl text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">
-                No assignments found for your semester
-              </p>
-              {(searchTerm || selectedCourse !== "all") && (
-                <button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedCourse("all");
-                  }}
-                  className="mt-4 text-blue-600 hover:text-blue-700 text-sm"
-                >
-                  Clear filters
-                </button>
-              )}
+            <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-200">
+              <p className="text-gray-500 text-sm md:text-base">No assignments found</p>
             </div>
           ) : (
             filteredAssignments.map((assignment) => {
               const isExpanded = expandedAssignments[assignment._id];
               const submissionStatus = getSubmissionStatusText(assignment._id);
-              const isChecking = checkingSubmission[assignment._id];
-              const deadlineStatus = getDeadlineStatus(
-                assignment.submissionDate,
-              );
-              const courseStyle = courseColorMap.get(
-                assignment.course?._id,
-              ) || {
-                bg: "bg-gradient-to-br from-gray-50 to-gray-100",
-                border: "border-gray-200",
-                hover: "hover:shadow-gray-100",
-                badge: "bg-gray-100 text-gray-700",
-                icon: "text-gray-600",
-              };
+              const deadlineStatus = getDeadlineStatus(assignment.submissionDate);
+              const allSubmissions = window.allSubmissions?.[assignment._id] || [];
 
-              const allSubmissions =
-                window.allSubmissions?.[assignment._id] || [];
+              // Get specific theme for this course (default to green if none mapped yet)
+              const theme = courseColorMap.get(assignment.course?._id) || courseColorMap.values().next().value;
+
+              // Dynamic Status Colors
+              const isSubmitted = submissionStatus.text === "Submitted";
+              const statusDotGlow = isSubmitted ? "bg-emerald-400" : "bg-red-400";
+              const statusDotCore = isSubmitted ? "bg-emerald-500 border-emerald-200" : "bg-red-500 border-white/80";
+              const statusTextColor = isSubmitted ? "text-emerald-700" : "text-[#c42020]";
+              const statusIconColor = isSubmitted ? "text-emerald-600" : "text-[#dd4b4b]";
 
               return (
+                // Main 3D Card Container
                 <div
                   key={assignment._id}
-                  className={`${courseStyle.bg} rounded-xl shadow-sm border ${courseStyle.border} overflow-hidden hover:shadow-xl transition-all duration-300 ${courseStyle.hover}`}
+                  className={`relative rounded-[32px] md:rounded-[40px] p-4 md:p-6 border ${theme.container}`}
                 >
-                  <div className="p-6">
-                    {/* Header with Full Assignment Name */}
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-start gap-3">
-                          <Link
-                            href={`/student/assignments/view/${assignment._id}`}
-                            className="flex-shrink-0"
-                          >
-                            <FaFilePdf className="text-red-500 text-2xl hover:text-red-600 transition-colors" />
-                          </Link>
-                          <div className="flex-1">
-                            {/* Full assignment name displayed prominently */}
-                            <Link
-                              href={`/student/assignments/view/${assignment._id}`}
-                              className="group"
-                            >
-                              <h3 className="text-sm md:text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors break-words">
-                                {assignment.title}
-                              </h3>
-                            </Link>
-                            <div className="flex flex-wrap items-center gap-2 mt-2">
-                              <span className="text-xs md:text-sm text-gray-600">
-                                {assignment.course?.courseName}
-                              </span>
-                              <span className="text-xs text-gray-400">•</span>
-                              <span className="text-xs md:text-sm font-mono text-gray-500">
-                                {assignment.course?.courseCode}
-                              </span>
-                              {assignment.chapter && (
-                                <>
-                                  <span className="text-xs text-gray-400">
-                                    •
-                                  </span>
-                                  <span
-                                    className={`text-xs px-2 py-0.5 rounded-full ${courseStyle.badge}`}
-                                  >
-                                    Chapter {assignment.chapter}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Status Badges */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isChecking ? (
-                          <span className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
-                            Checking...
-                          </span>
-                        ) : (
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                              submissionStatus.color === "green"
-                                ? "bg-green-100 text-green-700"
-                                : submissionStatus.color === "orange"
-                                  ? "bg-orange-100 text-orange-700"
-                                  : "bg-red-100 text-red-700"
-                            }`}
-                          >
-                            {submissionStatus.icon} {submissionStatus.text}
-                          </span>
-                        )}
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                            deadlineStatus.color === "orange"
-                              ? "bg-orange-100 text-orange-700"
-                              : deadlineStatus.color === "green"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {deadlineStatus.text}
-                        </span>
-                        {deadlineStatus.text === "Expired" &&
-                          submissionStatus.text === "Not Submitted" && (
-                            <span
-                              className={`px-3 py-1 text-xs font-semibold whitespace-nowrap text-green-700`}
-                            >
-                              You can still submit
-                            </span>
-                          )}
-                      </div>
+                  {/* Top Embossed Header Card */}
+                  <div className={`rounded-[20px] md:rounded-[24px] p-3 md:p-4 mb-4 md:mb-5 border flex items-center gap-3 md:gap-4 ${theme.header}`}>
+                    <div className="bg-[#ff5c5c] p-2 md:p-2.5 rounded-xl shadow-[inset_2px_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(255,92,92,0.4)] shrink-0">
+                      <FaFilePdf className="text-white text-2xl md:text-3xl drop-shadow-sm" />
                     </div>
-                    {/* Submission Date */}
-                    <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-gray-600 mb-1 md:mb-4 p-3 bg-white/50 rounded-lg">
-                      <FiCalendar className="flex-shrink-0 text-blue-500" />
-                      <span className="font-medium">Submission Deadline:</span>
-                      <span>{formatDateLong(assignment.submissionDate)}</span>
+                    <div className="min-w-0">
+                      <h3 className="text-base md:text-xl font-bold text-gray-800 drop-shadow-sm truncate">
+                        {assignment.title}
+                      </h3>
+                      <p className="text-gray-700 text-xs md:text-sm font-medium truncate mt-0.5">
+                        {assignment.course?.courseName} • {assignment.course?.courseCode}
+                      </p>
                     </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2 md:gap-3 pt-3 border-t border-gray-200">
-                      {assignment.pdfUrl && (
-                        <Link
-                          href={`/student/assignments/view/${assignment._id}`}
-                          className="flex text-xs md:text items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
-                        >
-                          <FiEye size={16} /> View Assignment
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => toggleAssignment(assignment._id)}
-                        className="flex text-xs md:text-md items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition"
-                      >
-                        {isExpanded ? (
-                          <FiChevronUp size={16} />
-                        ) : (
-                          <FiChevronDown size={16} />
-                        )}
-                        {isExpanded
-                          ? "Hide Submissions"
-                          : "View All Submissions"}
-                        {!isExpanded && allSubmissions.length > 0 && (
-                          <span className="ml-1 text-xs bg-gray-200 px-1.5 py-0.5 rounded-full">
-                            {allSubmissions.length}
-                          </span>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Submissions List - Expandable */}
-                    {isExpanded && (
-                      <div className="mt-5 pt-4 border-t border-gray-200">
-                        <div className="flex items-center gap-2 mb-3">
-                          <FiUsers className="text-green-600" />
-                          <h4 className="font-semibold text-gray-900">
-                            All Student Submissions
-                          </h4>
-                          <span className="text-xs text-gray-500">
-                            ({allSubmissions.length} total)
-                          </span>
-                        </div>
-                        {allSubmissions.length === 0 ? (
-                          <div className="text-center py-6 bg-gray-50 rounded-lg">
-                            <p className="text-gray-500 text-sm">
-                              No submissions yet
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="bg-gray-100 border-b border-gray-200">
-                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
-                                    #
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
-                                    Student Name
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
-                                    Student ID
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
-                                    Submission Date
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-gray-800 font-semibold">
-                                    Status
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100">
-                                {allSubmissions.map((sub, index) => (
-                                  <tr
-                                    key={sub._id}
-                                    className="hover:bg-gray-50 transition"
-                                  >
-                                    <td className="px-3 py-2 text-gray-600">
-                                      {index + 1}
-                                    </td>
-                                    <td className="px-3 text-xs md:text-sm py-2 font-medium text-gray-900">
-                                      {sub.studentName || sub.student?.name}
-                                      {String(
-                                        sub.student?._id || sub.student,
-                                      ) === String(user?._id) && (
-                                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                                          You
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-3 text-xs md:text-sm py-2 text-gray-600 font-mono text-xs">
-                                      {sub.studentCollegeId ||
-                                        sub.student?.collegeId}
-                                    </td>
-                                    <td className="px-3 text-xs md:text-sm py-2 text-gray-600 whitespace-nowrap">
-                                      {sub.submittedAt
-                                        ? formatDateShort(sub.submittedAt)
-                                        : "N/A"}
-                                    </td>
-                                    <td className="px-3 text-xs md:text-sm py-2">
-                                      <span
-                                        className={`inline-block text-gray-700 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap`}
-                                      >
-                                        {(() => {
-                                          const submittedDate = new Date(
-                                            sub.submittedAt,
-                                          );
-                                          const dueDate = new Date(
-                                            assignment?.submissionDate,
-                                          );
-                                          submittedDate.setHours(0, 0, 0, 0);
-                                          dueDate.setHours(0, 0, 0, 0);
-
-                                          return submittedDate <= dueDate
-                                            ? "✅On Time"
-                                            : "⚠️Late";
-                                        })()}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
+
+                  {/* Chapter Pill (Debossed glass look) */}
+                  {assignment.chapter && (
+                    <div className={`inline-block rounded-full px-4 md:px-5 py-1.5 md:py-2 mb-4 md:mb-5 border text-xs md:text-sm font-bold tracking-wide ${theme.pill}`}>
+                      Chapter {assignment.chapter}
+                    </div>
+                  )}
+
+                  {/* Status Bar (White Pill with dynamic colored dot) */}
+                  <div className="bg-gradient-to-b from-[#f8f9f8] to-[#e4e5e4] rounded-full p-1.5 md:p-2 pr-3 md:pr-4 mb-5 md:mb-6 flex items-center justify-between shadow-[0_4px_8px_rgba(0,0,0,0.1),inset_0_2px_2px_rgba(255,255,255,1)] border border-white">
+                    <div className="flex items-center gap-2 md:gap-3 px-2">
+                      <div className="relative flex items-center justify-center w-5 h-5 md:w-6 md:h-6 shrink-0">
+                        {/* Glowing Dot */}
+                        <div className={`absolute w-full h-full rounded-full blur-[4px] opacity-80 ${statusDotGlow}`}></div>
+                        <div className={`relative w-3 h-3 md:w-4 md:h-4 rounded-full border-2 ${statusDotCore}`}></div>
+                      </div>
+                      <span className={`text-xs md:text-base font-bold tracking-wide ${statusTextColor}`}>
+                        {submissionStatus.text}
+                      </span>
+                    </div>
+                    <FiClock className={`text-2xl md:text-3xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.2)] shrink-0 ${statusIconColor}`} />
+                  </div>
+
+                  {/* Deadline Box (Debossed Inner Shadow) */}
+                  <div className={`rounded-[16px] md:rounded-[20px] p-4 md:p-5 mb-5 md:mb-6 border border-transparent ${theme.deadline}`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3 md:gap-4">
+                        <FiCalendar className="text-gray-700 text-2xl md:text-3xl drop-shadow-sm shrink-0" />
+                        <div className="flex flex-col text-gray-700 font-medium text-xs md:text-sm">
+                          <span>Submission</span>
+                          <span>Deadline:</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex flex-col">
+                        <span className="block text-gray-800 font-semibold text-sm md:text-lg w-24 md:w-32 text-left leading-tight">
+                          {formatDateLong(assignment.submissionDate).replace(',', ',\n')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Status Text */}
+                  {deadlineStatus.text === "Expired" && !isSubmitted && (
+                    <p className={`font-bold text-sm md:text-lg mb-3 md:mb-4 ml-2 tracking-wide ${theme.text}`}>
+                      You can still submit
+                    </p>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-3 md:gap-4">
+                    {/* Primary Button (Blue Glassmorphic Pill) */}
+                    {assignment.pdfUrl && (
+                      <Link
+                        href={`/student/assignments/view/${assignment._id}`}
+                        className="w-full bg-blue-100/40 backdrop-blur-md border border-white/60 text-blue-700 font-bold text-sm md:text-base rounded-full py-3 md:py-4 flex items-center justify-center gap-2 shadow-[0_8px_16px_rgba(59,130,246,0.15),inset_0_3px_6px_rgba(255,255,255,0.8)] hover:bg-blue-100/60 hover:shadow-[0_12px_20px_rgba(59,130,246,0.2),inset_0_3px_6px_rgba(255,255,255,0.9)] transition-all duration-300"
+                      >
+                        <FiEye className="text-lg md:text-xl drop-shadow-sm" /> View Assignment
+                      </Link>
+                    )}
+
+                    {/* Secondary Button (Silver Metallic Pill) */}
+                    <button
+                      onClick={() => toggleAssignment(assignment._id)}
+                      className="w-full bg-gradient-to-b from-[#e8e9e8] to-[#d1d2d1] border-t border-white text-gray-700 font-bold text-sm md:text-base rounded-full py-3 md:py-4 flex items-center justify-center gap-2 shadow-[0_6px_12px_rgba(0,0,0,0.1),inset_0_2px_4px_rgba(255,255,255,0.8)] active:shadow-[inset_0_4px_8px_rgba(0,0,0,0.1)] transition-all"
+                    >
+                      {isExpanded ? <FiChevronUp className="text-lg md:text-xl" /> : <FiChevronDown className="text-lg md:text-xl" />}
+                      {isExpanded ? "Hide Submissions" : "View All Submissions"}
+                    </button>
+                  </div>
+
+                  {/* Expanded Submissions List */}
+                  {isExpanded && (
+                    <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-white/30">
+                      <h4 className="font-bold text-gray-800 text-sm md:text-base mb-3 md:mb-4 flex items-center gap-2">
+                        <FiUsers className={`text-lg ${theme.text}`} /> All Submissions ({allSubmissions.length})
+                      </h4>
+                      {allSubmissions.length === 0 ? (
+                        <p className="text-center text-gray-700 font-medium text-xs md:text-sm py-4">No submissions yet.</p>
+                      ) : (
+                        <div className="space-y-2 md:space-y-3">
+                          {allSubmissions.map((sub) => (
+                            <div key={sub._id} className="bg-white/40 backdrop-blur-sm rounded-xl p-2.5 md:p-3 flex justify-between items-center shadow-[inset_1px_1px_3px_rgba(255,255,255,0.5)] border border-white/20">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-gray-800 text-xs md:text-sm">{sub.studentName || sub.student?.name}</span>
+                                <span className="text-[10px] md:text-xs text-gray-700 font-mono">{sub.studentCollegeId || sub.student?.collegeId}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] md:text-xs font-bold text-gray-700 block mb-1">
+                                  {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString() : "N/A"}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })
