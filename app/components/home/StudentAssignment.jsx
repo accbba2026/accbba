@@ -22,11 +22,11 @@ const StudentAssignment = () => {
   const [expandedAssignments, setExpandedAssignments] = useState({});
   const [submissionStatusMap, setSubmissionStatusMap] = useState({});
   const [checkingSubmission, setCheckingSubmission] = useState({});
+  // Store fetched submissions in state instead of window
+  const [submissionsMap, setSubmissionsMap] = useState({});
+  const [loadingSubmissions, setLoadingSubmissions] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("all");
-
-  console.log(assignments);
-  console.log(submissionStatusMap);
 
   const studentSemester = user?.semester || "1st";
 
@@ -171,13 +171,12 @@ const StudentAssignment = () => {
     });
   };
 
+  // Fetch all submissions for an assignment (only if not cached)
   const fetchAllSubmissions = async (assignmentId) => {
-    //eslint-disable-next-line
-    if (!window.allSubmissions) window.allSubmissions = {};
-    if (window.allSubmissions[assignmentId]) return;
+    // Already cached in state - no need to fetch again
+    if (submissionsMap[assignmentId]) return;
 
-    setExpandedAssignments((prev) => ({ ...prev, [assignmentId]: true }));
-
+    setLoadingSubmissions((prev) => ({ ...prev, [assignmentId]: true }));
     try {
       const response = await fetch(
         `/api/student/assignments/submissions?assignmentId=${assignmentId}`,
@@ -186,18 +185,27 @@ const StudentAssignment = () => {
 
       const data = await response.json();
       if (data.success) {
-        //eslint-disable-next-line
-        window.allSubmissions[assignmentId] = data.data;
-        setExpandedAssignments((prev) => ({ ...prev }));
+        setSubmissionsMap((prev) => ({
+          ...prev,
+          [assignmentId]: data.data,
+        }));
       }
     } catch (error) {
       console.error("Error fetching submissions:", error);
+      // Set empty array so it doesn't get stuck loading
+      setSubmissionsMap((prev) => ({
+        ...prev,
+        [assignmentId]: [],
+      }));
+    } finally {
+      setLoadingSubmissions((prev) => ({ ...prev, [assignmentId]: false }));
     }
   };
 
   const toggleAssignment = async (assignmentId) => {
     const isExpanded = expandedAssignments[assignmentId];
     if (!isExpanded) {
+      setExpandedAssignments((prev) => ({ ...prev, [assignmentId]: true }));
       await fetchAllSubmissions(assignmentId);
     } else {
       setExpandedAssignments((prev) => ({ ...prev, [assignmentId]: false }));
@@ -475,7 +483,9 @@ const StudentAssignment = () => {
                         assignment.submissionDate,
                       );
                       const allSubmissions =
-                        window.allSubmissions?.[assignment._id] || [];
+                        submissionsMap[assignment._id] || [];
+                      const isLoadingSubmissions =
+                        loadingSubmissions[assignment._id];
 
                       const isSubmitted =
                         submissionStatus?.text === "Submitted";
@@ -529,14 +539,11 @@ const StudentAssignment = () => {
                             {isStatusLoading ? (
                               <>
                                 <div className="flex items-center gap-2 px-2 flex-1">
-                                  {/* Shimmer dot */}
                                   <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
                                     <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse"></div>
                                   </div>
-                                  {/* Shimmer text bar */}
                                   <div className="h-3 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite] w-32 md:w-40"></div>
                                 </div>
-                                {/* Shimmer icon */}
                                 <div className="h-6 w-6 md:h-7 md:w-7 rounded-full bg-gray-200 animate-pulse shrink-0"></div>
                               </>
                             ) : (
@@ -628,9 +635,25 @@ const StudentAssignment = () => {
                                 <FiUsers
                                   className={`text-base ${theme.text}`}
                                 />{" "}
-                                All Submissions ({allSubmissions.length})
+                                All Submissions
+                                {!isLoadingSubmissions &&
+                                  ` (${allSubmissions.length})`}
                               </h4>
-                              {allSubmissions.length === 0 ? (
+
+                              {isLoadingSubmissions ? (
+                                // Loading spinner while fetching submissions
+                                <div className="flex flex-col items-center justify-center py-6 gap-2">
+                                  <div
+                                    className={`animate-spin rounded-full h-7 w-7 border-b-2 ${theme.text.replace(
+                                      "text-",
+                                      "border-",
+                                    )}`}
+                                  ></div>
+                                  <span className="text-xs text-gray-700 font-medium">
+                                    Loading submissions...
+                                  </span>
+                                </div>
+                              ) : allSubmissions.length === 0 ? (
                                 <p className="text-center text-gray-700 font-medium text-xs py-3">
                                   No submissions yet.
                                 </p>
@@ -655,7 +678,11 @@ const StudentAssignment = () => {
                                           {sub.submittedAt
                                             ? new Date(
                                                 sub.submittedAt,
-                                              ).toLocaleDateString()
+                                              ).toLocaleDateString("en-GB", {
+                                                day: "numeric",
+                                                month: "long",
+                                                year: "2-digit",
+                                              })
                                             : "N/A"}
                                         </span>
                                       </div>
@@ -676,7 +703,7 @@ const StudentAssignment = () => {
         )}
       </div>
 
-      {/* Shimmer keyframes - add this to your global CSS if not present */}
+      {/* Shimmer keyframes */}
       <style jsx global>{`
         @keyframes shimmer {
           0% {
