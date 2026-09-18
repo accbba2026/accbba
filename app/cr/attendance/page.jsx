@@ -346,7 +346,7 @@ const CRAttendancePage = () => {
     );
   };
 
-  // Print attendance report
+ // Print attendance report
   const handlePrint = () => {
     const printContent = document.getElementById(
       "attendance-print-area",
@@ -364,26 +364,75 @@ const CRAttendancePage = () => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; padding: 10px; background: white; }
+        body { font-family: Arial, Helvetica, sans-serif; background: white; }
+        
         @media print {
-          @page { size: A4 landscape; margin: 0.3cm; }
+          /* Minimize page margins to edge-to-edge */
+          @page { size: A4 landscape; margin: 0.15cm; }
           .print-hide { display: none !important; }
-          body { padding: 0; margin: 0; }
-          .print-header { margin-bottom: 15px; text-align: center; }
-          .print-header h1 { font-size: 14pt; margin: 0; }
-          .print-header h2 { font-size: 12pt; margin: 5px 0; }
-          table { font-size: 7pt; }
-          th, td { padding: 2px 3px; }
+          body { 
+            padding: 0; 
+            margin: 0; 
+            font-size: 5pt !important; /* Global tiny text */
+            line-height: 1.1 !important; 
+          }
+          
+          /* --- Override Tailwind Constraints --- */
+          .whitespace-nowrap { white-space: normal !important; }
+          [class*="min-w-"] { min-width: 0 !important; } 
+          .overflow-x-auto { overflow: visible !important; }
+          
+          /* --- Ultra-Compact Table Layout --- */
+          table { 
+            width: 100% !important; 
+            max-width: 100% !important;
+            font-size: 5pt !important; 
+            table-layout: auto !important;
+            border-collapse: collapse !important;
+          }
+          
+          th, td { 
+            padding: 1px !important; /* Strip all padding to 1px */
+            word-break: break-word !important; 
+            white-space: normal !important;
+            border: 0.5px solid #e5e7eb !important;
+            height: auto !important;
+          }
+
+          /* Strip Tailwind paddings forcefully */
+          .px-4, .py-4, .px-2, .py-3 { padding: 1px !important; }
+          
+          /* Adjust Headers */
+          .print-header { margin-bottom: 5px; text-align: center; }
+          .print-header h1 { font-size: 9pt; margin: 0; font-weight: bold; }
+          .print-header h2 { font-size: 7pt; margin: 2px 0; }
+          .print-header p { font-size: 5pt; margin: 1px 0; }
+          
+          /* Shrink Icons & UI elements drastically */
+          svg { width: 7px !important; height: 7px !important; }
+          .w-6, .h-6 { width: 9px !important; height: 9px !important; min-width: 9px !important; } 
+          .text-\\[10px\\] { font-size: 4pt !important; padding: 0 !important; line-height: 1 !important; } 
+          .gap-2 { gap: 1px !important; }
+          
+          /* Remove sticky positioning for print */
+          .sticky, .left-0, .left-\\[100px\\] { position: static !important; }
         }
-        .print-header { margin-bottom: 20px; text-align: center; }
-        .print-header h1 { font-size: 18px; margin: 0; }
-        .print-header h2 { font-size: 16px; margin: 5px 0; color: #555; }
-        .print-header p { font-size: 12px; margin: 3px 0; color: #777; }
-        table { border-collapse: collapse; width: 100%; font-size: 10px; }
-        th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: center; }
+        
+        /* General styling for iframe render before print */
+        .print-header { margin-bottom: 10px; text-align: center; }
+        .print-header h1 { font-size: 14px; margin: 0; }
+        .print-header h2 { font-size: 12px; margin: 2px 0; color: #555; }
+        .print-header p { font-size: 10px; margin: 2px 0; color: #777; }
+        table { border-collapse: collapse; width: 100%; font-size: 6px; }
+        th, td { border: 1px solid #ddd; padding: 1px; text-align: center; }
         th { background-color: #f5f5f5; font-weight: bold; }
         .text-left { text-align: left; }
-        .print-footer { margin-top: 15px; font-size: 9px; text-align: center; color: #888; }
+        .print-footer { margin-top: 5px; font-size: 6px; text-align: center; color: #888; }
+        
+        /* Apply wrap fallback outside of @media print as well */
+        .overflow-x-auto { overflow: visible !important; }
+        .whitespace-nowrap { white-space: normal !important; }
+        [class*="min-w-"] { min-width: 0 !important; } 
       </style>
     </head>
     <body>
@@ -446,7 +495,6 @@ const CRAttendancePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100 py-8 px-2 md:px-6 font-sans text-gray-800">
       <div className="container mx-auto max-w-7xl">
-        
         {/* Header Section */}
         <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-6 md:p-8 mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -463,14 +511,15 @@ const CRAttendancePage = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex flex-wrap gap-3 w-full md:w-auto">
               <button
                 onClick={handlePrint}
                 disabled={attendanceDates.length === 0}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FiPrinter className="text-lg" /> <span className="hidden sm:inline">Print Report</span>
+                <FiPrinter className="text-lg" />{" "}
+                <span className="hidden sm:inline">Print Report</span>
               </button>
               <button
                 onClick={() => {
@@ -496,7 +545,11 @@ const CRAttendancePage = () => {
                 : "bg-red-50 text-red-800 border border-red-200"
             }`}
           >
-            {message.type === "error" ? <FiAlertCircle className="text-xl shrink-0" /> : <FiCheckCircle className="text-xl shrink-0" />}
+            {message.type === "error" ? (
+              <FiAlertCircle className="text-xl shrink-0" />
+            ) : (
+              <FiCheckCircle className="text-xl shrink-0" />
+            )}
             <span className="font-medium">{message.text}</span>
           </div>
         )}
@@ -512,7 +565,9 @@ const CRAttendancePage = () => {
 
           <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-end w-full xl:w-auto">
             <div className="w-full sm:w-auto">
-              <label className="block text-gray-500 mb-1.5 text-xs font-semibold uppercase tracking-wider">Start Date</label>
+              <label className="block text-gray-500 mb-1.5 text-xs font-semibold uppercase tracking-wider">
+                Start Date
+              </label>
               <input
                 type="date"
                 value={startDate}
@@ -521,7 +576,9 @@ const CRAttendancePage = () => {
               />
             </div>
             <div className="w-full sm:w-auto">
-              <label className="block text-gray-500 mb-1.5 text-xs font-semibold uppercase tracking-wider">End Date</label>
+              <label className="block text-gray-500 mb-1.5 text-xs font-semibold uppercase tracking-wider">
+                End Date
+              </label>
               <input
                 type="date"
                 value={endDate}
@@ -529,7 +586,7 @@ const CRAttendancePage = () => {
                 className="w-full sm:w-40 text-gray-700 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm font-medium"
               />
             </div>
-            
+
             <div className="flex gap-2 w-full sm:w-auto mt-4 sm:mt-0">
               <button
                 onClick={handleDateRangeChange}
@@ -544,11 +601,16 @@ const CRAttendancePage = () => {
                 Last 30 Days
               </button>
               <button
-                onClick={() => fetchAttendanceWithRange(userSemester, startDate, endDate)}
+                onClick={() =>
+                  fetchAttendanceWithRange(userSemester, startDate, endDate)
+                }
                 className="px-4 py-2.5 bg-blue-50 text-blue-600 font-medium rounded-xl hover:bg-blue-100 border border-blue-100 transition-all text-sm flex items-center justify-center shrink-0"
                 title="Refresh Data"
               >
-                <FiRefreshCw className={loading ? "animate-spin" : ""} size={18} />
+                <FiRefreshCw
+                  className={loading ? "animate-spin" : ""}
+                  size={18}
+                />
               </button>
             </div>
           </div>
@@ -558,8 +620,15 @@ const CRAttendancePage = () => {
         {startDate && endDate && (
           <div className="mb-4 text-sm font-medium text-gray-500 flex items-center gap-2">
             <FiCalendar className="text-gray-400" />
-            Report timeframe: <span className="text-gray-800">{formatToDDMMYYYY(startDate)}</span> to <span className="text-gray-800">{formatToDDMMYYYY(endDate)}</span>
-            <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs ml-2">{attendanceDates.length} Days tracked</span>
+            Report timeframe:{" "}
+            <span className="text-gray-800">
+              {formatToDDMMYYYY(startDate)}
+            </span>{" "}
+            to{" "}
+            <span className="text-gray-800">{formatToDDMMYYYY(endDate)}</span>
+            <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs ml-2">
+              {attendanceDates.length} Days tracked
+            </span>
           </div>
         )}
 
@@ -569,7 +638,9 @@ const CRAttendancePage = () => {
             {loadingStudents ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="text-gray-500 font-medium">Loading student roster...</p>
+                <p className="text-gray-500 font-medium">
+                  Loading student roster...
+                </p>
               </div>
             ) : students.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20">
@@ -596,9 +667,13 @@ const CRAttendancePage = () => {
                           key={date}
                           className="px-2 py-3 text-center min-w-[65px] border-l border-gray-200/50"
                         >
-                          <div className="text-gray-800 font-bold">{formatTableDateShort(date)}</div>
+                          <div className="text-gray-800 font-bold">
+                            {formatTableDateShort(date)}
+                          </div>
                           <div className="text-[10px] font-semibold uppercase text-emerald-600 mt-0.5 bg-emerald-50 rounded px-1 inline-block">
-                            {new Date(date).toLocaleDateString("en-GB", { weekday: "short" }).slice(0, 3)}
+                            {new Date(date)
+                              .toLocaleDateString("en-GB", { weekday: "short" })
+                              .slice(0, 3)}
                           </div>
                         </th>
                       ))}
@@ -613,20 +688,28 @@ const CRAttendancePage = () => {
                   <tbody className="divide-y divide-gray-100">
                     {students.map((student, index) => {
                       const presentCount = getPresentCount(student._id);
-                      const percentage = parseFloat(getAttendancePercentage(student._id));
+                      const percentage = parseFloat(
+                        getAttendancePercentage(student._id),
+                      );
                       const isCR = student.isCR || student.role === "cr";
-                      
+
                       return (
                         <tr
                           key={student._id}
                           className={`group transition-colors ${
-                            isCR ? "bg-blue-50/30 hover:bg-blue-50/60" : "hover:bg-slate-50"
+                            isCR
+                              ? "bg-blue-50/30 hover:bg-blue-50/60"
+                              : "hover:bg-slate-50"
                           }`}
                         >
-                          <td className={`left-0 z-10 px-4 py-3 font-mono text-xs text-gray-600 shadow-[1px_0_0_#e5e7eb] transition-colors ${isCR ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]" : "bg-white group-hover:bg-slate-50"}`}>
+                          <td
+                            className={`left-0 z-10 px-4 py-3 font-mono text-xs text-gray-600 shadow-[1px_0_0_#e5e7eb] transition-colors ${isCR ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]" : "bg-white group-hover:bg-slate-50"}`}
+                          >
                             {student.collegeId}
                           </td>
-                          <td className={`left-[100px] z-10 px-4 py-3 shadow-[1px_0_0_#e5e7eb] transition-colors ${isCR ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]" : "bg-white group-hover:bg-slate-50"}`}>
+                          <td
+                            className={`left-[100px] z-10 px-4 py-3 shadow-[1px_0_0_#e5e7eb] transition-colors ${isCR ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]" : "bg-white group-hover:bg-slate-50"}`}
+                          >
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-gray-800 truncate max-w-[130px]">
                                 {student.name}
@@ -638,10 +721,13 @@ const CRAttendancePage = () => {
                               )}
                             </div>
                           </td>
-                          
+
                           {attendanceDates.map((date) => {
                             const hasRecord = hasAttendance(date, student._id);
-                            const record = getAttendanceRecord(date, student._id);
+                            const record = getAttendanceRecord(
+                              date,
+                              student._id,
+                            );
                             return (
                               <td
                                 key={date}
@@ -655,7 +741,13 @@ const CRAttendancePage = () => {
                                       <TiTick className="text-lg" />
                                     </div>
                                     <button
-                                      onClick={() => handleDeleteAttendance(record?._id, date, student.name)}
+                                      onClick={() =>
+                                        handleDeleteAttendance(
+                                          record?._id,
+                                          date,
+                                          student.name,
+                                        )
+                                      }
                                       className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded-md transition-colors print-hide cursor-pointer shadow-sm border border-red-100 flex items-center justify-center"
                                       title="Remove attendance"
                                     >
@@ -663,14 +755,18 @@ const CRAttendancePage = () => {
                                     </button>
                                   </div>
                                 ) : (
-                                  <span className="text-gray-300 font-bold">—</span>
+                                  <span className="text-gray-300 font-bold">
+                                    
+                                  </span>
                                 )}
                               </td>
                             );
                           })}
-                          
+
                           <td className="px-4 py-3 text-center font-bold text-gray-700 bg-slate-50/50 border-l border-gray-100 shadow-[-1px_0_0_#e5e7eb]">
-                            <span className="text-emerald-600">{presentCount}</span>
+                            <span className="text-emerald-600">
+                              {presentCount}
+                            </span>
                             <span className="text-gray-400 mx-1">/</span>
                             <span>{attendanceDates.length}</span>
                           </td>
@@ -680,8 +776,8 @@ const CRAttendancePage = () => {
                                 percentage >= 75
                                   ? "bg-green-100 text-green-700 border border-green-200"
                                   : percentage >= 60
-                                  ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                                  : "bg-red-100 text-red-700 border border-red-200"
+                                    ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                                    : "bg-red-100 text-red-700 border border-red-200"
                               }`}
                             >
                               {percentage}%
@@ -693,16 +789,32 @@ const CRAttendancePage = () => {
                   </tbody>
                   <tfoot className="bg-slate-50 border-t border-gray-200">
                     <tr>
-                      <td colSpan="2" className="sticky left-0 z-10 px-4 py-4 text-xs font-bold text-gray-700 bg-slate-50 shadow-[1px_0_0_#e5e7eb]">
+                      <td
+                        colSpan="2"
+                        className="sticky left-0 z-10 px-4 py-4 text-xs font-bold text-gray-700 bg-slate-50 shadow-[1px_0_0_#e5e7eb]"
+                      >
                         <div className="flex items-center gap-2">
                           <FiCalendar className="text-emerald-600" />
                           Total Recorded Classes: {attendanceDates.length}
                         </div>
                       </td>
-                      <td colSpan={attendanceDates.length + 2} className="px-4 py-4 text-xs text-gray-500 font-medium text-right">
-                        <span className="inline-flex items-center gap-1 mx-2"><div className="w-3 h-3 rounded-full bg-emerald-100 flex items-center justify-center text-[8px] text-emerald-600"><TiTick/></div> Present</span>
-                        <span className="inline-flex items-center gap-1 mx-2"><span className="text-gray-300 font-bold">—</span> Absent</span>
-                        <span className="inline-flex items-center gap-1 mx-2"><FiTrash2 className="text-red-400" size={10} /> Delete</span>
+                      <td
+                        colSpan={attendanceDates.length + 2}
+                        className="px-4 py-4 text-xs text-gray-500 font-medium text-right"
+                      >
+                        <span className="inline-flex items-center gap-1 mx-2">
+                          <div className="w-3 h-3 rounded-full bg-emerald-100 flex items-center justify-center text-[8px] text-emerald-600">
+                            <TiTick />
+                          </div>{" "}
+                          Present
+                        </span>
+                        <span className="inline-flex items-center gap-1 mx-2">
+                          <span className="text-gray-300 font-bold">—</span>{" "}
+                          Absent
+                        </span>
+                        <span className="inline-flex items-center gap-1 mx-2">
+                          <FiTrash2 className="text-red-400" size={10} /> Delete
+                        </span>
                       </td>
                     </tr>
                   </tfoot>
@@ -720,18 +832,26 @@ const CRAttendancePage = () => {
                 <FiUsers className="text-2xl text-blue-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-500 mb-1">Total Roster</p>
-                <p className="text-3xl font-bold text-gray-900">{students.length}</p>
+                <p className="text-sm font-semibold text-gray-500 mb-1">
+                  Total Roster
+                </p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {students.length}
+                </p>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center gap-5 hover:shadow-md transition-shadow">
               <div className="bg-emerald-50 p-4 rounded-xl">
                 <FiCalendar className="text-2xl text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-500 mb-1">Classes Recorded</p>
-                <p className="text-3xl font-bold text-gray-900">{attendanceDates.length}</p>
+                <p className="text-sm font-semibold text-gray-500 mb-1">
+                  Classes Recorded
+                </p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {attendanceDates.length}
+                </p>
               </div>
             </div>
 
@@ -740,12 +860,15 @@ const CRAttendancePage = () => {
                 <FaUserCheck className="text-2xl text-purple-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-500 mb-1">Average Attendance</p>
+                <p className="text-sm font-semibold text-gray-500 mb-1">
+                  Average Attendance
+                </p>
                 <div className="flex items-baseline gap-2">
                   <p className="text-3xl font-bold text-gray-900">
                     {(
                       students.reduce(
-                        (acc, s) => acc + parseFloat(getAttendancePercentage(s._id)),
+                        (acc, s) =>
+                          acc + parseFloat(getAttendancePercentage(s._id)),
                         0,
                       ) / students.length
                     ).toFixed(1)}
@@ -761,7 +884,6 @@ const CRAttendancePage = () => {
         {showAddModal && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-100 transform transition-all">
-              
               {/* Modal Header */}
               <div className="bg-gray-50/50 flex justify-between items-center px-6 py-5 border-b border-gray-100">
                 <div className="flex items-center gap-3">
@@ -781,15 +903,22 @@ const CRAttendancePage = () => {
               </div>
 
               {/* Modal Body */}
-              <form onSubmit={handleSubmitAttendance} className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
-                
+              <form
+                onSubmit={handleSubmitAttendance}
+                className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6"
+              >
                 {/* Auto Date Notice */}
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
                   <FiCalendar className="text-blue-500 text-xl shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-blue-900 text-sm">Recording for Today</h4>
+                    <h4 className="font-semibold text-blue-900 text-sm">
+                      Recording for Today
+                    </h4>
                     <p className="text-blue-700 text-xs mt-1">
-                      Date automatically set to <strong>{formatToDDMMYYYY(selectedDate)}</strong>. The system locks logs to the current date to prevent backdating.
+                      Date automatically set to{" "}
+                      <strong>{formatToDDMMYYYY(selectedDate)}</strong>. The
+                      system locks logs to the current date to prevent
+                      backdating.
                     </p>
                   </div>
                 </div>
@@ -809,9 +938,10 @@ const CRAttendancePage = () => {
                       placeholder="e.g., 521017, 521018..."
                       className="flex-1 w-full md:w-auto text-gray-700 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono text-sm outline-none"
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === "Enter") {
                           e.preventDefault();
-                          const input = document.getElementById("collegeIdsInput");
+                          const input =
+                            document.getElementById("collegeIdsInput");
                           if (input && input.value) {
                             addMultipleStudents(input.value);
                             input.value = "";
@@ -822,7 +952,8 @@ const CRAttendancePage = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const input = document.getElementById("collegeIdsInput");
+                        const input =
+                          document.getElementById("collegeIdsInput");
                         if (input && input.value) {
                           addMultipleStudents(input.value);
                           input.value = "";
@@ -883,7 +1014,7 @@ const CRAttendancePage = () => {
                           {selectedStudentIds.length} students
                         </span>
                       </label>
-                      <button 
+                      <button
                         type="button"
                         onClick={() => setSelectedStudentIds([])}
                         className="text-xs font-semibold text-red-500 hover:text-red-700"
@@ -891,10 +1022,12 @@ const CRAttendancePage = () => {
                         Clear All
                       </button>
                     </div>
-                    
+
                     <div className="bg-gray-50 border border-gray-200 rounded-xl max-h-[220px] overflow-y-auto custom-scrollbar p-1">
                       {selectedStudentIds.map((studentId) => {
-                        const student = students.find((s) => s._id === studentId);
+                        const student = students.find(
+                          (s) => s._id === studentId,
+                        );
                         if (!student) return null;
                         return (
                           <div
@@ -928,7 +1061,7 @@ const CRAttendancePage = () => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Modal Footer Actions */}
                 <div className="flex gap-3 pt-6 border-t border-gray-100 mt-6 sticky bottom-0 bg-white">
                   <button
@@ -940,7 +1073,11 @@ const CRAttendancePage = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting || selectedStudentIds.length === 0 || !selectedDate}
+                    disabled={
+                      submitting ||
+                      selectedStudentIds.length === 0 ||
+                      !selectedDate
+                    }
                     className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-md shadow-emerald-200 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {submitting ? (
@@ -979,18 +1116,28 @@ const CRAttendancePage = () => {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #94a3b8;
         }
-        
+
         @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
         .animate-fade-in {
           animation: fadeIn 0.2s ease-out forwards;
         }
-        
+
         @keyframes fadeInDown {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
         .animate-fade-in-down {
           animation: fadeInDown 0.3s ease-out forwards;
