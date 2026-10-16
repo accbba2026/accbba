@@ -8,7 +8,8 @@ import ACCLOGO from "../../assets/acclogo.png";
 import { FiMail, FiLock, FiAlertCircle, FiArrowLeft } from "react-icons/fi";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  // ✅ Grab loading + isAuthenticated from auth context
+  const { login, loading: authLoading, isAuthenticated } = useAuth();
 
   // Login state
   const [loginType, setLoginType] = useState("student");
@@ -31,6 +32,13 @@ export default function LoginPage() {
   const [step, setStep] = useState("request"); // 'request', 'verify', 'reset'
   const [identifier, setIdentifier] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
+
+  // ✅ If user is already authenticated, redirect away from login page
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      window.location.href = "/";
+    }
+  }, [authLoading, isAuthenticated]);
 
   // Timer for resend OTP
   useEffect(() => {
@@ -58,6 +66,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(loginData),
+        credentials: "include",
       });
 
       const data = await response.json();
@@ -110,7 +119,7 @@ export default function LoginPage() {
     }
   };
 
-  // In LoginPage.jsx - Make sure handleVerifyOTP is not sending newPassword
+  // Verify OTP
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     setResetMessage("");
@@ -124,7 +133,6 @@ export default function LoginPage() {
           identifier,
           otp,
           loginType,
-          // NO newPassword here - this is just verification
         }),
       });
 
@@ -176,7 +184,7 @@ export default function LoginPage() {
 
       if (data.success) {
         setResetMessage(
-          "Password reset successful! Please login with your new password.",
+          "Password reset successful! Please login with your new password."
         );
         setTimeout(() => {
           setShowForgotPassword(false);
@@ -242,6 +250,42 @@ export default function LoginPage() {
     setResendTimer(0);
   };
 
+  // ✅ While auth is being checked, show a full-page loader
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="flex flex-col items-center gap-4">
+          <svg
+            className="animate-spin h-10 w-10 text-blue-600"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <p className="text-gray-500 text-sm">Checking session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ If authenticated, don't render login form (redirect happens in useEffect)
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl">
@@ -304,7 +348,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setLoginType("admin")}
-                className={`flex-1 py-2 text-xs md:text-sm rounded-md transition ${
+                className={`flex-1 py-2 px-2 text-xs md:text-sm rounded-md transition ${
                   loginType === "admin"
                     ? "bg-blue-600 text-white"
                     : "text-gray-600 hover:bg-gray-200"

@@ -28,6 +28,7 @@ const apiPermissions = {
     "/api/faculty/courses/create",
     "/api/faculty/courses/update",
     "/api/faculty/courses/delete",
+    "/api/user/delete-student",
   ],
 
   // Admin + Faculty + CR APIs

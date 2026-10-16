@@ -12,8 +12,7 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      unique: true,
-      sparse: true,
+      lowercase: true,
     },
     password: {
       type: String,
@@ -63,7 +62,6 @@ const userSchema = new mongoose.Schema(
 
 // Create indexes for better query performance
 userSchema.index({ collegeId: 1 });
-userSchema.index({ email: 1 });
 userSchema.index({ createdAt: -1 });
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);

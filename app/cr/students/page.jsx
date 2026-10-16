@@ -1,4 +1,4 @@
-// app/cr/students/page.jsx - Updated to include CR in student list
+// app/cr/students/page.jsx
 "use client";
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
@@ -13,14 +13,20 @@ import {
   FiPhone,
   FiUser,
   FiStar,
+  FiPrinter,
+  FiDroplet,
 } from "react-icons/fi";
 import { FaStar, FaUsers, FaGraduationCap } from "react-icons/fa";
+import toast from "react-hot-toast";
+
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 const CRStudentsPage = () => {
   const { user } = useAuth();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchType, setSearchType] = useState("name");
   const [message, setMessage] = useState({ type: "", text: "" });
 
   // Add Student Modal
@@ -30,6 +36,7 @@ const CRStudentsPage = () => {
     collegeId: "",
     phone: "",
     email: "",
+    bloodGroup: "",
     semester: "",
   });
 
@@ -40,12 +47,11 @@ const CRStudentsPage = () => {
     name: "",
     phone: "",
     email: "",
+    bloodGroup: "",
   });
 
-  // Get CR's semester from user data
   const crSemester = user?.semester || "1st";
 
-  // Fetch students for CR's semester only and include CR
   const fetchStudents = async () => {
     setLoading(true);
     try {
@@ -56,28 +62,26 @@ const CRStudentsPage = () => {
       if (data.success) {
         let allStudents = [...data.data];
 
-        // Add the CR to the list if they are in the same semester
+        // Add the CR themselves if not present
         if (user && user.role === "cr" && user.semester === crSemester) {
-          // Check if CR is already in the list (avoid duplicate)
           const crExists = allStudents.some(
             (s) => s.collegeId === user.collegeId,
           );
           if (!crExists && user.collegeId) {
-            const crStudent = {
+            allStudents.unshift({
               _id: user.id,
               name: user.name,
               collegeId: user.collegeId,
               phone: user.phone || null,
               email: user.email || null,
+              bloodGroup: user.bloodGroup || null,
               semester: user.semester,
               session: user.session,
               role: "cr",
-              isCR: true, // Mark as CR for special styling
-            };
-            allStudents.unshift(crStudent); // Add CR at the top
+              isCR: true,
+            });
           }
         }
-
         setStudents(allStudents);
       }
     } catch (error) {
@@ -89,76 +93,78 @@ const CRStudentsPage = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      //eslint-disable-next-line
-      fetchStudents();
-    }
+    if (user) fetchStudents();
+    // eslint-disable-next-line
   }, [user]);
 
-  // Filter students based on search
-  const filteredStudents = students.filter(
-    (student) =>
-      student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.collegeId?.includes(searchTerm),
-  );
+  // Search filter
+  const filteredStudents = students.filter((student) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    if (searchType === "name")
+      return student.name?.toLowerCase().includes(term);
+    if (searchType === "collegeId")
+      return student.collegeId?.includes(searchTerm);
+    if (searchType === "phone") return student.phone?.includes(searchTerm);
+    if (searchType === "bloodGroup")
+      return student.bloodGroup && student.bloodGroup.toLowerCase() === term;
+    return true;
+  });
 
-  // Handle input change for add form
-  const handleInputChange = (e) => {
+  const handleInputChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  // Handle edit input change
-  const handleEditInputChange = (e) => {
+  const handleEditInputChange = (e) =>
     setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
-  };
 
-  // Add new student
+  // Add student
   const handleAddStudent = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setMessage({ type: "", text: "" });
 
-    // Validate college ID format
     if (!/^\d{6}$/.test(formData.collegeId)) {
-      setMessage({ type: "error", text: "College ID must be 6 digits" });
-      setLoading(false);
+      toast.error("College ID must be 6 digits");
       return;
     }
 
+    setLoading(true);
     try {
-      const response = await fetch("/api/cr/create-student", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          semester: crSemester,
-        }),
+      await toast.promise(
+        (async () => {
+          const response = await fetch("/api/cr/create-student", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...formData, semester: crSemester }),
+          });
+          const data = await response.json();
+          if (!data.success)
+            throw new Error(data.message || "Failed to add student");
+          return data;
+        })(),
+        {
+          loading: "Adding student...",
+          success: "Student added successfully!",
+          error: (err) => err.message || "Failed to add student",
+        },
+      );
+
+      setFormData({
+        name: "",
+        collegeId: "",
+        phone: "",
+        email: "",
+        bloodGroup: "",
+        semester: "",
       });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage({ type: "success", text: "Student added successfully!" });
-        setFormData({
-          name: "",
-          collegeId: "",
-          phone: "",
-          email: "",
-          semester: "",
-        });
-        setIsAddModalOpen(false);
-        fetchStudents();
-      } else {
-        setMessage({ type: "error", text: data.message });
-      }
+      setIsAddModalOpen(false);
+      await fetchStudents();
     } catch (error) {
-      setMessage({ type: "error", text: "An error occurred" });
+      console.error("Add student error:", error);
+      setMessage({ type: "error", text: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  // Open edit modal (only for regular students, not CR)
   const openEditModal = (student) => {
     if (student.isCR) {
       setMessage({
@@ -172,43 +178,153 @@ const CRStudentsPage = () => {
       name: student.name,
       phone: student.phone || "",
       email: student.email || "",
+      bloodGroup: student.bloodGroup || "",
     });
     setIsEditModalOpen(true);
   };
 
-  // Update student
   const handleUpdateStudent = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: "", text: "" });
 
     try {
-      const response = await fetch("/api/cr/update-student", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingStudent._id,
-          name: editFormData.name,
-          phone: editFormData.phone,
-          email: editFormData.email,
-        }),
-      });
+      await toast.promise(
+        (async () => {
+          const response = await fetch("/api/cr/update-student", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: editingStudent._id,
+              name: editFormData.name,
+              phone: editFormData.phone,
+              email: editFormData.email,
+              bloodGroup: editFormData.bloodGroup,
+            }),
+          });
 
-      const data = await response.json();
+          const data = await response.json();
 
-      if (data.success) {
-        setMessage({ type: "success", text: "Student updated successfully!" });
-        setIsEditModalOpen(false);
-        setEditingStudent(null);
-        fetchStudents();
-      } else {
-        setMessage({ type: "error", text: data.message });
-      }
+          if (!data.success) {
+            throw new Error(data.message || "Failed to update student");
+          }
+
+          return data;
+        })(),
+        {
+          loading: "Updating student...",
+          success: "Student updated successfully!",
+          error: (err) => err.message || "Failed to update student",
+        },
+      );
+
+      // On success:
+      setIsEditModalOpen(false);
+      setEditingStudent(null);
+      await fetchStudents();
     } catch (error) {
-      setMessage({ type: "error", text: "An error occurred" });
+      console.error("Update student error:", error);
+      setMessage({ type: "error", text: error.message });
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ Print: College ID first, then name, phone, and blank space for checkmark
+  const handlePrint = () => {
+    const studentsToPrint = [...filteredStudents].sort((a, b) =>
+      (a.collegeId || "").localeCompare(b.collegeId || ""),
+    );
+
+    if (studentsToPrint.length === 0) {
+      window.alert("No students to print.");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=900,height=800");
+    if (!printWindow) {
+      window.alert("Please allow popups to print.");
+      return;
+    }
+
+    const rowsHtml = studentsToPrint
+      .map(
+        (s, idx) => `
+        <tr>
+          <td class="serial">${idx + 1}</td>
+          <td class="id">${s.collegeId || "—"}</td>
+          <td class="name">${s.name || "—"}</td>
+          <td class="phone">${s.phone || "—"}</td>
+          <td class="blank"></td>
+        </tr>`,
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Student List - ${crSemester} Semester</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              padding: 24px;
+              color: #111;
+            }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #15803d; padding-bottom: 12px; }
+            .header h1 { margin: 0; color: #15803d; font-size: 20px; }
+            .header h2 { margin: 4px 0 0; font-size: 15px; font-weight: 500; color: #444; }
+            .header p { margin: 4px 0 0; font-size: 11px; color: #666; }
+            .meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px; color: #444; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            thead { background: #15803d; color: white; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
+            th { font-weight: 600; }
+            tbody tr:nth-child(even) { background: #f9fafb; }
+            td.blank { min-width: 120px; background: #fff !important; }
+            .footer { margin-top: 24px; font-size: 10px; color: #666; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+            .note { font-size: 10px; color: #666; margin-top: 6px; font-style: italic; }
+            @media print {
+              body { padding: 12px; }
+              thead { background: #15803d !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Department of BBA — Adamjee Cantonment College</h1>
+            <h2>${crSemester} Semester — Student List</h2>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+          </div>
+          <div class="meta">
+            <span>Total Students: <strong>${studentsToPrint.length}</strong></span>
+            <span>Semester: <strong>${crSemester}</strong></span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th style="width: 120px;">College ID</th>
+                <th>Name</th>
+                <th style="width: 140px;">Phone</th>
+                <th>Notes / Checkmark</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <p class="note">* Use the last column for checkmarks, notes, or signatures.</p>
+          <div class="footer">BBA Department • Adamjee Cantonment College</div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() { window.print(); }, 300);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -216,7 +332,7 @@ const CRStudentsPage = () => {
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <FaStar className="text-3xl text-green-600" />
@@ -231,16 +347,25 @@ const CRStudentsPage = () => {
                 </span>
               </p>
             </div>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-            >
-              <FiUserPlus /> Add Student
-            </button>
+            <div className="flex gap-2">
+              {/* ✅ Print button */}
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-green-400 hover:text-green-700 transition font-medium shadow-sm"
+              >
+                <FiPrinter /> Print
+              </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                <FiUserPlus /> Add Student
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Message Display */}
+        {/* Message */}
         {message.text && (
           <div
             className={`mb-6 p-4 rounded-lg ${
@@ -255,47 +380,91 @@ const CRStudentsPage = () => {
 
         {/* Search Bar */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          {/* Mobile layout (stacked) / Desktop layout (flex row) */}
-          <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-            {/* Search input wrapper with icon */}
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl hidden md:block" />
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl md:hidden" />
-              <input
-                type="text"
-                placeholder="Search by name or college ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-gray-500 pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-              {/* Clear button inside input on mobile */}
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                >
-                  <FiX />
-                </button>
-              )}
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="md:w-48">
+              <label className="block text-gray-700 mb-2 text-sm font-medium">
+                Search by
+              </label>
+              <select
+                value={searchType}
+                onChange={(e) => {
+                  setSearchType(e.target.value);
+                  setSearchTerm("");
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+              >
+                <option value="name">Name</option>
+                <option value="collegeId">College ID</option>
+                <option value="phone">Phone</option>
+                <option value="bloodGroup">Blood Group</option>
+              </select>
             </div>
-
-            {/* Refresh button - full width on mobile */}
-            <button
-              onClick={fetchStudents}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition md:w-auto w-full"
-            >
-              <FiRefreshCw className={loading ? "animate-spin" : ""} />
-              <span>Refresh</span>
-            </button>
+            <div className="flex-1">
+              <label className="block text-gray-700 mb-2 text-sm font-medium">
+                {searchType === "bloodGroup"
+                  ? "Select Blood Group"
+                  : "Search Term"}
+              </label>
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                {searchType === "bloodGroup" ? (
+                  <select
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+                  >
+                    <option value="">All blood groups</option>
+                    {BLOOD_GROUPS.map((bg) => (
+                      <option key={bg} value={bg}>
+                        {bg}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder={`Search by ${searchType}...`}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full text-gray-700 pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      >
+                        <FiX />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="md:self-end">
+              <button
+                onClick={fetchStudents}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition w-full md:w-auto"
+              >
+                <FiRefreshCw className={loading ? "animate-spin" : ""} />
+                <span>Refresh</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Statistics Card */}
+        {/* Statistics */}
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-6 mb-6">
           <div className="flex justify-between items-center">
             <div>
               <p className="text-green-100 text-sm">Total Students</p>
               <p className="text-white text-3xl font-bold">{students.length}</p>
+              {searchTerm && (
+                <p className="text-green-100 text-xs mt-1">
+                  Showing {filteredStudents.length} match
+                  {filteredStudents.length !== 1 ? "es" : ""}
+                </p>
+              )}
             </div>
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
               <FaUsers className="text-white text-3xl" />
@@ -303,36 +472,20 @@ const CRStudentsPage = () => {
           </div>
         </div>
 
-        {/* Students Table */}
+        {/* Students Table - Redesigned */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    #
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    Name
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    College ID
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    Phone
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    Email
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    Semester
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    Role
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    Actions
-                  </th>
+                <tr className="text-gray-600 text-xs uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left">#</th>
+                  <th className="px-6 py-4 text-left">Student</th>
+                  <th className="px-6 py-4 text-left">College ID</th>
+                  <th className="px-6 py-4 text-left">Blood</th>
+                  <th className="px-6 py-4 text-left">Phone</th>
+                  <th className="px-6 py-4 text-left">Email</th>
+                  <th className="px-6 py-4 text-left">Role</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -351,77 +504,104 @@ const CRStudentsPage = () => {
                   filteredStudents.map((student, index) => (
                     <tr
                       key={student._id}
-                      className={`hover:bg-gray-50 transition ${student.isCR ? "bg-yellow-50" : ""}`}
+                      className={`transition-colors ${
+                        student.isCR
+                          ? "bg-yellow-50/60 hover:bg-yellow-100/60"
+                          : "hover:bg-green-50/40"
+                      }`}
                     >
-                      <td className="px-6 py-4 text-gray-600">{index + 1}</td>
+                      <td className="px-6 py-4 text-gray-600 text-sm">
+                        {index + 1}
+                      </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {student.isCR ? (
-                            <FiStar className="text-yellow-500" />
-                          ) : (
-                            <FiUser className="text-green-500" />
-                          )}
-                          <span
-                            className={`font-medium ${student.isCR ? "text-yellow-700" : "text-gray-900"}`}
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${
+                              student.isCR
+                                ? "bg-gradient-to-br from-yellow-400 to-orange-500 text-white"
+                                : "bg-gradient-to-br from-green-500 to-emerald-600 text-white"
+                            }`}
                           >
-                            {student.name}
-                            {student.isCR && (
-                              <span className="ml-2 text-xs text-yellow-600">
-                                (You - CR)
-                              </span>
+                            {student.isCR ? (
+                              <FiStar size={14} />
+                            ) : (
+                              student.name?.charAt(0).toUpperCase()
                             )}
-                          </span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900 flex items-center gap-2">
+                              {student.name}
+                              {student.isCR && (
+                                <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">
+                                  You (CR)
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-mono text-gray-600">
-                        {student.collegeId}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {student.phone || "—"}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {student.email || "—"}
-                      </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            student.isCR
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-green-100 text-green-700"
-                          }`}
-                        >
-                          {student.semester}
+                        <span className="font-mono text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                          {student.collegeId}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                            student.isCR
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          {student.isCR
-                            ? "CR"
-                            : student?.role === "student"
-                              ? "Student"
-                              : "CR"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {!student.isCR && (
-                          <button
-                            onClick={() => openEditModal(student)}
-                            className="text-blue-600 hover:text-blue-800 transition flex items-center gap-1"
-                          >
-                            <FiEdit2 /> Edit
-                          </button>
-                        )}
-                        {student.isCR && (
-                          <span className="text-gray-400 text-sm">
-                            Edit from Profile
+                        {student.bloodGroup ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                            <FiDroplet className="text-red-500" size={12} />
+                            {student.bloodGroup}
                           </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 text-sm">
+                        {student.phone ? (
+                          <span className="flex items-center gap-1.5">
+                            <FiPhone size={12} className="text-gray-400" />
+                            {student.phone}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 text-sm">
+                        {student.email ? (
+                          <span className="flex items-center gap-1.5">
+                            <FiMail size={12} className="text-gray-400" />
+                            {student.email}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            student.isCR
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-blue-50 text-blue-600"
+                          }`}
+                        >
+                          {student.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-end">
+                          {!student.isCR ? (
+                            <button
+                              onClick={() => openEditModal(student)}
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
+                              title="Edit"
+                            >
+                              <FiEdit2 size={14} />
+                            </button>
+                          ) : (
+                            <span className="text-gray-400 text-xs italic">
+                              Edit from Profile
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -468,7 +648,7 @@ const CRStudentsPage = () => {
                     value={formData.name}
                     onChange={handleInputChange}
                     required
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="Enter student name"
                   />
                 </div>
@@ -484,7 +664,7 @@ const CRStudentsPage = () => {
                     onChange={handleInputChange}
                     required
                     pattern="\d{6}"
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="Enter 6-digit ID"
                   />
                 </div>
@@ -499,12 +679,9 @@ const CRStudentsPage = () => {
                     value={formData.phone}
                     onChange={handleInputChange}
                     pattern="01[3-9]\d{8}"
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="e.g., 017xxxxxxxx"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Bangladeshi number: 01XXXXXXXXX
-                  </p>
                 </div>
 
                 <div>
@@ -516,9 +693,30 @@ const CRStudentsPage = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="student@example.com"
                   />
+                </div>
+
+                {/* ✅ Blood group */}
+                <div>
+                  <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
+                    <FiDroplet className="text-red-500" /> Blood Group
+                    (Optional)
+                  </label>
+                  <select
+                    name="bloodGroup"
+                    value={formData.bloodGroup}
+                    onChange={handleInputChange}
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Not specified</option>
+                    {BLOOD_GROUPS.map((bg) => (
+                      <option key={bg} value={bg}>
+                        {bg}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -529,7 +727,7 @@ const CRStudentsPage = () => {
                     type="text"
                     value={crSemester}
                     disabled
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Student will be added to your semester
@@ -585,7 +783,7 @@ const CRStudentsPage = () => {
                     value={editFormData.name}
                     onChange={handleEditInputChange}
                     required
-                    className="w-full px-4 text-gray-500 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                   />
                 </div>
 
@@ -597,11 +795,8 @@ const CRStudentsPage = () => {
                     type="text"
                     value={editingStudent.collegeId}
                     disabled
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    College ID cannot be changed
-                  </p>
                 </div>
 
                 <div>
@@ -614,7 +809,7 @@ const CRStudentsPage = () => {
                     value={editFormData.phone}
                     onChange={handleEditInputChange}
                     pattern="01[3-9]\d{8}"
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="e.g., 017xxxxxxxx"
                   />
                 </div>
@@ -628,9 +823,29 @@ const CRStudentsPage = () => {
                     name="email"
                     value={editFormData.email}
                     onChange={handleEditInputChange}
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                     placeholder="student@example.com"
                   />
+                </div>
+
+                {/* ✅ Blood group in edit modal */}
+                <div>
+                  <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
+                    <FiDroplet className="text-red-500" /> Blood Group
+                  </label>
+                  <select
+                    name="bloodGroup"
+                    value={editFormData.bloodGroup}
+                    onChange={handleEditInputChange}
+                    className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Not specified</option>
+                    {BLOOD_GROUPS.map((bg) => (
+                      <option key={bg} value={bg}>
+                        {bg}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -641,7 +856,7 @@ const CRStudentsPage = () => {
                     type="text"
                     value={editingStudent.semester}
                     disabled
-                    className="w-full text-gray-500 px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Semester cannot be changed by CR

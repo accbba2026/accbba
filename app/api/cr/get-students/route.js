@@ -7,43 +7,41 @@ import { getCurrentUser } from '@/app/lib/authUtils';
 export async function GET(request) {
   try {
     await connectToDatabase();
-    
+
     const currentUser = await getCurrentUser();
-    
+
     if (!currentUser || currentUser.role !== 'cr') {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 403 }
       );
     }
-    
+
     const { searchParams } = new URL(request.url);
     const semester = searchParams.get('semester');
-    
+
     // Fetch students AND include the CR themselves
     const query = {
-      collegeId: { $exists: true, $ne: null, $ne: "" },
+      collegeId: { $exists: true, $nin: [null, ''] },
       semester: semester || currentUser.semester,
-      // Include both students and the CR
-      role: { $in: ['student', 'cr'] }
+      role: { $in: ['student', 'cr'] },
     };
-    
+
     const students = await User.find(query)
-      .select('name collegeId phone email semester role')
+      // ✅ Added bloodGroup
+      .select('name collegeId phone email semester role bloodGroup session')
       .sort({ collegeId: 1 });
-    
-    // Mark the CR in the list for special handling
-    const studentsWithFlag = students.map(student => ({
+
+    const studentsWithFlag = students.map((student) => ({
       ...student.toObject(),
-      isCR: student._id.toString() === currentUser._id.toString()
+      isCR: student._id.toString() === currentUser._id.toString(),
     }));
-    
+
     return NextResponse.json({
       success: true,
       data: studentsWithFlag,
-      count: studentsWithFlag.length
+      count: studentsWithFlag.length,
     });
-    
   } catch (error) {
     console.error('Error fetching students for CR:', error);
     return NextResponse.json(

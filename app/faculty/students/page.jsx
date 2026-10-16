@@ -16,11 +16,28 @@ import {
   FiPhone,
   FiMail,
   FiLock,
+  FiPrinter,
+  FiDroplet,
 } from "react-icons/fi";
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaGraduationCap, FaUserGraduate } from "react-icons/fa";
 import { HiOutlineUserGroup } from "react-icons/hi";
 import { MdDelete } from "react-icons/md";
+import toast from 'react-hot-toast';
+
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const SEMESTER_ORDER = [
+  "1st",
+  "2nd",
+  "3rd",
+  "4th",
+  "5th",
+  "6th",
+  "7th",
+  "8th",
+  "graduated",
+  "unassigned",
+];
 
 export default function StudentManagement() {
   const { user } = useAuth();
@@ -32,6 +49,7 @@ export default function StudentManagement() {
     collegeId: "",
     phone: "",
     email: "",
+    bloodGroup: "",
     semester: "1st",
     session: "2024-25",
     status: "active",
@@ -55,57 +73,88 @@ export default function StudentManagement() {
     collegeId: "",
     phone: "",
     email: "",
-    password: "", // Add password field
+    password: "",
+    bloodGroup: "",
     semester: "",
     session: "",
     status: "",
     role: "",
   });
 
-  // Collapsible sections state
+  // Collapsible sections
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [isBulkOperationsOpen, setIsBulkOperationsOpen] = useState(false);
 
+  // ✅ Semester collapse state — empty object means ALL collapsed by default
+  const [openSemesters, setOpenSemesters] = useState({});
+
   const [deletingStudentId, setDeletingStudentId] = useState(null);
 
-  const handleDeleteStudent = async (studentId) => {
-    const isConfirmed = window.confirm(
-      "Are you sure you want to delete this student? This action cannot be undone.",
+const handleDeleteStudent = async (studentId) => {
+  // Confirm dialog via toast
+  const confirmed = await new Promise((resolve) => {
+    toast(
+      (t) => (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium text-white">
+            Delete this student? This action cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(false);
+              }}
+              className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(true);
+              }}
+              className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ),
+      { duration: 10000, position: 'top-center' }
     );
+  });
 
-    if (!isConfirmed) return;
+  if (!confirmed) return;
 
-    setDeletingStudentId(studentId); // Start specific loading state
+  setDeletingStudentId(studentId);
+  const toastId = toast.loading('Deleting student...');
 
-    try {
-      const response = await fetch("/api/user/delete-student", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: studentId }),
-      });
+  try {
+    const response = await fetch('/api/user/delete-student', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: studentId }),
+    });
+    const data = await response.json();
 
-      const data = await response.json();
-
-      if (data.success) {
-        window.alert("Student deleted successfully!");
-        fetchStudents();
-        fetchSemesterStats();
-      } else {
-        window.alert(data.message || "Failed to delete student.");
-      }
-    } catch (error) {
-      console.error("Error deleting student:", error);
-      window.alert("An error occurred while trying to delete the student.");
-    } finally {
-      setDeletingStudentId(null); // Stop specific loading state
+    if (data.success) {
+      toast.success('Student deleted successfully!', { id: toastId });
+      fetchStudents();
+      fetchSemesterStats();
+    } else {
+      toast.error(data.message || 'Failed to delete student.', { id: toastId });
     }
-  };
+  } catch (error) {
+    console.error('Error deleting student:', error);
+    toast.error('An error occurred while deleting the student.', { id: toastId });
+  } finally {
+    setDeletingStudentId(null);
+  }
+};
 
-  // Fetch students on load
   useEffect(() => {
-    //eslint-disable-next-line
     fetchStudents();
-    //eslint-disable-next-line
     fetchSemesterStats();
   }, []);
 
@@ -114,9 +163,7 @@ export default function StudentManagement() {
       setStudentFetchLoad(true);
       const response = await fetch("/api/user/get-students");
       const data = await response.json();
-      if (data.success) {
-        setStudents(data.data);
-      }
+      if (data.success) setStudents(data.data);
     } catch (error) {
       console.error("Error fetching students:", error);
     } finally {
@@ -126,46 +173,53 @@ export default function StudentManagement() {
 
   const fetchSemesterStats = async () => {
     try {
-      const response = await fetch(
-        "/api/user/bulk-update-semester?action=stats",
-      );
+      const response = await fetch("/api/user/bulk-update-semester?action=stats");
       const data = await response.json();
-      if (data.success) {
-        setSemesterStats(data.data);
-      }
+      if (data.success) setSemesterStats(data.data);
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
   };
 
-  // Filter students based on search
+  // Filter students
   const filteredStudents = students.filter((student) => {
     if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
 
-    if (searchType === "name") {
-      return student.name.toLowerCase().includes(searchTerm.toLowerCase());
-    } else if (searchType === "collegeId") {
-      return student.collegeId.toString().includes(searchTerm);
-    } else if (searchType === "phone") {
+    if (searchType === "name") return student.name.toLowerCase().includes(term);
+    if (searchType === "collegeId")
+      return student.collegeId?.toString().includes(searchTerm);
+    if (searchType === "phone")
       return student.phone && student.phone.includes(searchTerm);
-    } else if (searchType === "email") {
-      return (
-        student.email &&
-        student.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+    if (searchType === "email")
+      return student.email && student.email.toLowerCase().includes(term);
+    if (searchType === "bloodGroup")
+      return student.bloodGroup && student.bloodGroup.toLowerCase() === term;
     return true;
   });
 
-  // Group filtered students by semester
   const studentsBySemester = filteredStudents.reduce((acc, student) => {
-    const semester = student.semester;
-    if (!acc[semester]) {
-      acc[semester] = [];
-    }
+    const semester = student.semester || "unassigned";
+    if (!acc[semester]) acc[semester] = [];
     acc[semester].push(student);
     return acc;
   }, {});
+
+  // ✅ Toggle a semester open/closed
+  const toggleSemester = (semester) => {
+    setOpenSemesters((prev) => ({
+      ...prev,
+      [semester]: !prev[semester],
+    }));
+  };
+
+  // ✅ Expand all / Collapse all
+  const expandAll = () => {
+    const all = {};
+    Object.keys(studentsBySemester).forEach((s) => (all[s] = true));
+    setOpenSemesters(all);
+  };
+  const collapseAll = () => setOpenSemesters({});
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -182,35 +236,33 @@ export default function StudentManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-
       const data = await response.json();
 
       if (data.success) {
-        setMessage({ type: "success", text: "Student added successfully!" });
+       toast.success('Student added successfully!');
         setFormData({
           name: "",
           collegeId: "",
           phone: "",
           email: "",
+          bloodGroup: "",
+          semester: "1st",
+          session: "2024-25",
           status: "active",
           role: "student",
         });
         fetchStudents();
         fetchSemesterStats();
       } else {
-        setMessage({
-          type: "error",
-          text: data.message || "Failed to add student",
-        });
+       toast.error(data.message || 'Failed to add student');
       }
     } catch (error) {
-      setMessage({ type: "error", text: "An error occurred" });
+      toast.error('An error occurred while adding the student.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Open edit modal with student data
   const openEditModal = (student) => {
     setEditingStudent(student);
     setEditFormData({
@@ -218,15 +270,16 @@ export default function StudentManagement() {
       collegeId: student.collegeId,
       phone: student.phone || "",
       email: student.email || "",
-      semester: student.semester,
+      password: "",
+      bloodGroup: student.bloodGroup || "",
+      semester: student.semester || "",
       session: student.session || "2024-25",
-      status: student.status,
-      role: student.role,
+      status: student.status || "active",
+      role: student.role || "student",
     });
     setIsEditModalOpen(true);
   };
 
-  // Close edit modal
   const closeEditModal = () => {
     setIsEditModalOpen(false);
     setEditingStudent(null);
@@ -235,6 +288,8 @@ export default function StudentManagement() {
       collegeId: "",
       phone: "",
       email: "",
+      password: "",
+      bloodGroup: "",
       semester: "",
       session: "",
       status: "",
@@ -242,29 +297,19 @@ export default function StudentManagement() {
     });
   };
 
-  // Handle edit form input changes
   const handleEditInputChange = (e) => {
     setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
   };
 
-  // Save edited student - Add this validation before API call
   const handleSaveEdit = async () => {
-    // Client-side validation for CR role
     if (editFormData.role === "cr") {
       if (!editFormData.email || !editFormData.email.trim()) {
-        setMessage({
-          type: "error",
-          text: "Email is required for Class Representative (CR) role",
-        });
+        setMessage({ type: "error", text: "Email is required for CR role" });
         return;
       }
-
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailPattern.test(editFormData.email)) {
-        setMessage({
-          type: "error",
-          text: "Please enter a valid email address for CR",
-        });
+        setMessage({ type: "error", text: "Please enter a valid email address for CR" });
         return;
       }
     }
@@ -279,7 +324,8 @@ export default function StudentManagement() {
           name: editFormData.name,
           phone: editFormData.phone,
           email: editFormData.email,
-          password: editFormData.password, // Include password
+          password: editFormData.password,
+          bloodGroup: editFormData.bloodGroup,
           semester: editFormData.semester,
           session: editFormData.session,
           status: editFormData.status,
@@ -288,20 +334,13 @@ export default function StudentManagement() {
       });
 
       const data = await response.json();
-
       if (data.success) {
-        const successMessage = data.passwordSent
-          ? "Student updated successfully! Credentials have been sent to their email."
-          : "Student updated successfully!";
-        setMessage({ type: "success", text: successMessage });
+        setMessage({ type: "success", text: "Student updated successfully!" });
         closeEditModal();
         fetchStudents();
         fetchSemesterStats();
       } else {
-        setMessage({
-          type: "error",
-          text: data.message || "Failed to update student",
-        });
+        setMessage({ type: "error", text: data.message || "Failed to update student" });
       }
     } catch (error) {
       setMessage({ type: "error", text: "An error occurred" });
@@ -315,18 +354,13 @@ export default function StudentManagement() {
       setMessage({ type: "error", text: "Please select a semester" });
       return;
     }
-
     setLoading(true);
     try {
       const response = await fetch("/api/user/bulk-update-semester", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetSemester: bulkSemester,
-          studentIds: selectedStudents,
-        }),
+        body: JSON.stringify({ targetSemester: bulkSemester, studentIds: selectedStudents }),
       });
-
       const data = await response.json();
       if (data.success) {
         setMessage({ type: "success", text: data.message });
@@ -349,18 +383,13 @@ export default function StudentManagement() {
       setMessage({ type: "error", text: "Please select a session" });
       return;
     }
-
     setLoading(true);
     try {
       const response = await fetch("/api/user/bulk-update-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetSession: bulkSession,
-          studentIds: selectedStudents,
-        }),
+        body: JSON.stringify({ targetSession: bulkSession, studentIds: selectedStudents }),
       });
-
       const data = await response.json();
       if (data.success) {
         setMessage({ type: "success", text: data.message });
@@ -380,9 +409,7 @@ export default function StudentManagement() {
 
   const toggleStudentSelection = (studentId) => {
     setSelectedStudents((prev) =>
-      prev.includes(studentId)
-        ? prev.filter((id) => id !== studentId)
-        : [...prev, studentId],
+      prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId]
     );
   };
 
@@ -394,34 +421,155 @@ export default function StudentManagement() {
     }
   };
 
-  const semesterOrder = [
-    "1st",
-    "2nd",
-    "3rd",
-    "4th",
-    "5th",
-    "6th",
-    "7th",
-    "8th",
-    "graduated",
-  ];
+  // ✅ Print a single semester (or the whole filtered list)
+  const handlePrint = (semesterFilter = null) => {
+    const studentsToPrint = semesterFilter
+      ? students.filter((s) => s.semester === semesterFilter)
+      : filteredStudents;
+
+    if (studentsToPrint.length === 0) {
+      window.alert("No students to print.");
+      return;
+    }
+
+    const title = semesterFilter
+      ? `${
+          semesterFilter === "graduated"
+            ? "Graduated Students"
+            : `${semesterFilter} Semester`
+        } - Student List`
+      : "Student List";
+
+    const printWindow = window.open("", "_blank", "width=1200,height=800");
+    if (!printWindow) {
+      window.alert("Please allow popups to print.");
+      return;
+    }
+
+    const rowsHtml = studentsToPrint
+      .map(
+        (s, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>${s.name || "—"}</td>
+          <td>${s.collegeId || "—"}</td>
+          <td>${s.bloodGroup || "—"}</td>
+          <td>${s.phone || "—"}</td>
+          <td>${s.email || "—"}</td>
+          <td>${s.session || "—"}</td>
+          <td>${s.semester || "—"}</td>
+          <td>${s.status || "—"}</td>
+          <td>${s.role || "—"}</td>
+        </tr>`
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              padding: 24px;
+              color: #111;
+            }
+            .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #1e40af; padding-bottom: 16px; }
+            .header h1 { margin: 0; color: #1e40af; font-size: 22px; }
+            .header h2 { margin: 4px 0 0; font-size: 16px; font-weight: 500; color: #444; }
+            .header p { margin: 4px 0 0; font-size: 12px; color: #666; }
+            .meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; color: #444; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            thead { background: #1e40af; color: white; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+            th { font-weight: 600; }
+            tbody tr:nth-child(even) { background: #f9fafb; }
+            tbody tr:hover { background: #eff6ff; }
+            .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #666; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+            @media print {
+              body { padding: 12px; }
+              thead { background: #1e40af !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Department of BBA — Adamjee Cantonment College</h1>
+            <h2>${title}</h2>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+          </div>
+          <div class="meta">
+            <span>Total Students: <strong>${studentsToPrint.length}</strong></span>
+            <span>Filter: <strong>${semesterFilter || "All"}</strong></span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>College ID</th>
+                <th>Blood Group</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Session</th>
+                <th>Semester</th>
+                <th>Status</th>
+                <th>Role</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <div class="footer">BBA Department • Adamjee Cantonment College</div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() { window.print(); }, 250);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // ✅ Get semester stats (from API) or fallback to computed counts
+  const getSemesterCount = (sem) => {
+    const stat = semesterStats.find(
+      (s) =>
+        (s._id || s.semester || "").toString().toLowerCase() ===
+        sem.toString().toLowerCase()
+    );
+    if (stat && stat.count != null) return stat.count;
+    return studentsBySemester[sem]?.length || 0;
+  };
+
+  // ✅ Ordered list of semesters we actually have
+  const orderedSemesters = SEMESTER_ORDER.filter(
+    (s) => studentsBySemester[s] && studentsBySemester[s].length > 0
+  );
+  // Include any semesters not in the predefined order (safety)
+  Object.keys(studentsBySemester).forEach((s) => {
+    if (!orderedSemesters.includes(s)) orderedSemesters.push(s);
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <FaUserGraduate className="text-3xl text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">
-              Student Management
-            </h1>
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <FaUserGraduate className="text-3xl text-blue-600" />
+              <h1 className="text-3xl font-bold text-gray-900">Student Management</h1>
+            </div>
+            <p className="text-gray-600 ml-11">
+              Manage students, update semesters, and track academic progress
+            </p>
           </div>
-          <p className="text-gray-600 ml-11">
-            Manage students, update semesters, and track academic progress
-          </p>
         </div>
 
-        {/* Message Display */}
+        {/* Message */}
         {message.text && (
           <div
             className={`mb-6 p-4 rounded-lg ${
@@ -442,15 +590,9 @@ export default function StudentManagement() {
           >
             <div className="flex items-center gap-3">
               <FiUserPlus className="text-xl text-blue-600" />
-              <h2 className="text-lg font-semibold text-gray-900">
-                Add New Student
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">Add New Student</h2>
             </div>
-            {isAddFormOpen ? (
-              <FiChevronUp className="text-gray-500" />
-            ) : (
-              <FiChevronDown className="text-gray-500" />
-            )}
+            {isAddFormOpen ? <FiChevronUp className="text-gray-500" /> : <FiChevronDown className="text-gray-500" />}
           </button>
 
           {isAddFormOpen && (
@@ -458,9 +600,7 @@ export default function StudentManagement() {
               <form onSubmit={handleSubmit}>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">
-                      Full Name *
-                    </label>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">Full Name *</label>
                     <input
                       type="text"
                       name="name"
@@ -473,9 +613,7 @@ export default function StudentManagement() {
                   </div>
 
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">
-                      College ID (6 digits) *
-                    </label>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">College ID (6 digits) *</label>
                     <input
                       type="text"
                       name="collegeId"
@@ -490,8 +628,7 @@ export default function StudentManagement() {
 
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                      <FiPhone className="text-gray-500" />
-                      Phone Number (Optional)
+                      <FiPhone className="text-gray-500" /> Phone Number (Optional)
                     </label>
                     <input
                       type="tel"
@@ -502,15 +639,11 @@ export default function StudentManagement() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                       placeholder="e.g., 017xxxxxxxx"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Bangladeshi number: 01XXXXXXXXX
-                    </p>
                   </div>
 
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                      <FiMail className="text-gray-500" />
-                      Email (Optional)
+                      <FiMail className="text-gray-500" /> Email (Optional)
                     </label>
                     <input
                       type="email"
@@ -523,30 +656,38 @@ export default function StudentManagement() {
                   </div>
 
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">
-                      Semester
+                    <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                      <FiDroplet className="text-red-500" /> Blood Group (Optional)
                     </label>
+                    <select
+                      name="bloodGroup"
+                      value={formData.bloodGroup}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                    >
+                      <option value="">Not specified</option>
+                      {BLOOD_GROUPS.map((bg) => (
+                        <option key={bg} value={bg}>{bg}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">Semester</label>
                     <select
                       name="semester"
                       value={formData.semester}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     >
-                      <option value="1st">1st Semester</option>
-                      <option value="2nd">2nd Semester</option>
-                      <option value="3rd">3rd Semester</option>
-                      <option value="4th">4th Semester</option>
-                      <option value="5th">5th Semester</option>
-                      <option value="6th">6th Semester</option>
-                      <option value="7th">7th Semester</option>
-                      <option value="8th">8th Semester</option>
+                      {["1st","2nd","3rd","4th","5th","6th","7th","8th"].map((s) => (
+                        <option key={s} value={s}>{s} Semester</option>
+                      ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">
-                      Session
-                    </label>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">Session</label>
                     <input
                       type="text"
                       name="session"
@@ -554,12 +695,9 @@ export default function StudentManagement() {
                       onChange={handleInputChange}
                       required
                       pattern="\d{4}-\d{2,4}"
-                      placeholder="e.g., 2021-22 or 2021-2022"
+                      placeholder="e.g., 2021-22"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Format: YYYY-YY or YYYY-YYYY (e.g., 2021-22 or 2021-2022)
-                    </p>
                   </div>
                 </div>
 
@@ -576,7 +714,7 @@ export default function StudentManagement() {
           )}
         </div>
 
-        {/* Bulk Operations - Collapsible */}
+        {/* Bulk Operations */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
           <button
             onClick={() => setIsBulkOperationsOpen(!isBulkOperationsOpen)}
@@ -584,29 +722,21 @@ export default function StudentManagement() {
           >
             <div className="flex items-center gap-3">
               <HiOutlineUserGroup className="text-xl text-purple-600" />
-              <h2 className="text-lg font-semibold text-gray-900">
-                Bulk Operations
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">Bulk Operations</h2>
               {selectedStudents.length > 0 && (
                 <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">
                   {selectedStudents.length} selected
                 </span>
               )}
             </div>
-            {isBulkOperationsOpen ? (
-              <FiChevronUp className="text-gray-500" />
-            ) : (
-              <FiChevronDown className="text-gray-500" />
-            )}
+            {isBulkOperationsOpen ? <FiChevronUp className="text-gray-500" /> : <FiChevronDown className="text-gray-500" />}
           </button>
 
           {isBulkOperationsOpen && (
             <div className="px-6 pb-6 border-t border-gray-100 pt-4">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                    Update Semester
-                  </label>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">Update Semester</label>
                   <div className="flex gap-2">
                     <select
                       value={bulkSemester}
@@ -614,15 +744,9 @@ export default function StudentManagement() {
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
                     >
                       <option value="">Select Semester</option>
-                      <option value="1st">1st Semester</option>
-                      <option value="2nd">2nd Semester</option>
-                      <option value="3rd">3rd Semester</option>
-                      <option value="4th">4th Semester</option>
-                      <option value="5th">5th Semester</option>
-                      <option value="6th">6th Semester</option>
-                      <option value="7th">7th Semester</option>
-                      <option value="8th">8th Semester</option>
-                      <option value="graduated">Graduated</option>
+                      {["1st","2nd","3rd","4th","5th","6th","7th","8th","graduated"].map((s) => (
+                        <option key={s} value={s}>{s === "graduated" ? "Graduated" : `${s} Semester`}</option>
+                      ))}
                     </select>
                     <button
                       onClick={handleBulkSemesterUpdate}
@@ -633,64 +757,45 @@ export default function StudentManagement() {
                     </button>
                   </div>
                 </div>
-              </div>
 
-              {selectedStudents.length > 0 && (
-                <div className="mt-4 p-3 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-purple-700">
-                    {selectedStudents.length} student(s) selected for bulk
-                    update
-                  </p>
+                <div>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">Update Session</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={bulkSession}
+                      onChange={(e) => setBulkSession(e.target.value)}
+                      placeholder="e.g., 2021-22"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
+                    />
+                    <button
+                      onClick={handleBulkSessionUpdate}
+                      disabled={loading || selectedStudents.length === 0}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 font-medium"
+                    >
+                      Update
+                    </button>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Semester Statistics */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <FaGraduationCap className="text-xl text-blue-600" />
-              <h2 className="text-lg font-semibold text-gray-900">
-                Semester Statistics
-              </h2>
-            </div>
-            <button
-              onClick={() => {
-                fetchStudents();
-                fetchSemesterStats();
-              }}
-              className="flex items-center gap-2 text-gray-500 hover:text-blue-600 transition"
-            >
-              <FiRefreshCw className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {semesterStats.map((stat) => (
-              <div
-                key={stat._id}
-                className="bg-gray-50 rounded-lg p-4 text-center border border-gray-200 hover:shadow-md transition"
-              >
-                <p className="text-2xl font-bold text-blue-600">{stat.count}</p>
-                <p className="text-gray-600 text-sm">
-                  {stat._id === "graduated"
-                    ? "🎓 Graduated"
-                    : `${stat._id} Sem`}
-                </p>
+        {/* Search & Controls */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-4">
+          <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+            <div className="flex flex-col sm:flex-row gap-2 flex-1">
+              <div className="relative flex-1">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={`Search by ${searchType}...`}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                />
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-gray-700 mb-2 text-sm font-medium">
-                Search by
-              </label>
               <select
                 value={searchType}
                 onChange={(e) => setSearchType(e.target.value)}
@@ -700,248 +805,281 @@ export default function StudentManagement() {
                 <option value="collegeId">College ID</option>
                 <option value="phone">Phone</option>
                 <option value="email">Email</option>
+                <option value="bloodGroup">Blood Group</option>
               </select>
             </div>
-            <div className="flex-[3]">
-              <label className="block text-gray-700 mb-2 text-sm font-medium">
-                Search Term
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={`Search by ${searchType}...`}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm("")}
-                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
-                  >
-                    Clear
-                  </button>
+
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={selectAllStudents}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium"
+              >
+                {selectedStudents.length === filteredStudents.length && filteredStudents.length > 0 ? (
+                  <FiCheckSquare />
+                ) : (
+                  <FiSquare />
                 )}
-              </div>
+                {selectedStudents.length === filteredStudents.length && filteredStudents.length > 0
+                  ? "Deselect All"
+                  : "Select All"}
+              </button>
+
+              <button
+                onClick={expandAll}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition text-sm font-medium"
+              >
+                <FiChevronDown /> Expand All
+              </button>
+
+              <button
+                onClick={collapseAll}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition text-sm font-medium"
+              >
+                <FiChevronUp /> Collapse All
+              </button>
+
+              <button
+                onClick={() => handlePrint(null)}
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm font-medium"
+              >
+                <FiPrinter /> Print All
+              </button>
+
+              <button
+                onClick={fetchStudents}
+                disabled={studentFetchLoad}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium disabled:opacity-50"
+              >
+                <FiRefreshCw className={studentFetchLoad ? "animate-spin" : ""} />
+                Refresh
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Select All Button */}
-        <div className="mb-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Students List{" "}
-            {searchTerm && `(Search results: ${filteredStudents.length})`}
-          </h2>
-          <button
-            onClick={selectAllStudents}
-            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 transition"
-          >
-            {selectedStudents.length === filteredStudents.length &&
-            filteredStudents.length > 0 ? (
-              <>
-                <FiCheckSquare /> Deselect All
-              </>
-            ) : (
-              <>
-                <FiSquare /> Select All
-              </>
-            )}
-          </button>
-        </div>
-        {/* Semester-wise Students Lists */}
-        <div className="space-y-6">
-          {semesterOrder.map((semester) => {
-            const semesterStudents = studentsBySemester[semester] || [];
-            if (semesterStudents.length === 0) return null;
-
-            return (
-              <div
-                key={semester}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
-              >
-                <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {semester === "graduated"
-                      ? "🎓 Graduated Students"
-                      : `${semester} Semester`}
-                    <span className="ml-2 text-sm text-gray-500 font-normal">
-                      ({semesterStudents.length} students)
-                    </span>
-                  </h3>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-white border-b border-gray-200">
-                      <tr className="text-gray-600 text-sm">
-                        <th className="px-4 py-3 text-left w-12">
-                          <input
-                            type="checkbox"
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                const allIds = semesterStudents.map(
-                                  (s) => s._id,
-                                );
-                                setSelectedStudents([
-                                  ...new Set([...selectedStudents, ...allIds]),
-                                ]);
-                              } else {
-                                const semesterIds = semesterStudents.map(
-                                  (s) => s._id,
-                                );
-                                setSelectedStudents(
-                                  selectedStudents.filter(
-                                    (id) => !semesterIds.includes(id),
-                                  ),
-                                );
-                              }
-                            }}
-                            checked={
-                              semesterStudents.length > 0 &&
-                              semesterStudents.every((s) =>
-                                selectedStudents.includes(s._id),
-                              )
-                            }
-                            className="rounded border-gray-300"
-                          />
-                        </th>
-                        <th className="px-4 py-3 text-left">Name</th>
-                        <th className="px-4 py-3 text-left">College ID</th>
-                        <th className="px-4 py-3 text-left">Phone</th>
-                        <th className="px-4 py-3 text-left">Email</th>
-                        <th className="px-4 py-3 text-left">Session</th>
-                        <th className="px-4 py-3 text-left">Status</th>
-                        <th className="px-4 py-3 text-left">Role</th>
-                        <th className="px-4 py-3 text-left">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {semesterStudents.map((student) => (
-                        <tr
-                          key={student._id}
-                          className="hover:bg-gray-50 transition"
-                        >
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedStudents.includes(student._id)}
-                              onChange={() =>
-                                toggleStudentSelection(student._id)
-                              }
-                              className="rounded border-gray-300"
-                            />
-                          </td>
-                          <td className="px-4 py-3 font-medium text-gray-900">
-                            {student.name}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-gray-600">
-                            {student.collegeId}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {student.phone || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {student.email || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {student.session || "N/A"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                student.status === "active"
-                                  ? "bg-green-100 text-green-700"
-                                  : student.status === "graduated"
-                                    ? "bg-purple-100 text-purple-700"
-                                    : "bg-gray-100 text-gray-700"
-                              }`}
-                            >
-                              {student.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 capitalize text-gray-600">
-                            {student.role}
-                          </td>
-                          <td className="flex px-4 py-3">
-                            <button
-                              onClick={() => openEditModal(student)}
-                              className="text-blue-600 hover:text-blue-800 transition flex items-center gap-1"
-                            >
-                              <FiEdit2 /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteStudent(student._id)}
-                              disabled={deletingStudentId === student._id}
-                              className="ml-4 text-red-600 hover:text-red-800 transition flex items-center gap-1 disabled:opacity-50"
-                            >
-                              {user?.role === "admin" ? (
-                                deletingStudentId === student._id ? (
-                                  <>
-                                    <FiRefreshCw className="animate-spin" />{" "}
-                                    Deleting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <MdDelete /> Delete
-                                  </>
-                                )
-                              ) : null}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {filteredStudents.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+        {/* ✅ Semester-wise Collapsible Sections */}
+        {studentFetchLoad ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+            <FiRefreshCw className="animate-spin text-4xl text-blue-600 mx-auto mb-3" />
+            <p className="text-gray-600">Loading students...</p>
+          </div>
+        ) : orderedSemesters.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <FaUserGraduate className="text-5xl text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">
-              {searchTerm
-                ? "No students match your search."
-                : studentFetchLoad
-                  ? "Loading..."
-                  : "No students found. Add your first student!"}
+            <p className="text-gray-600">
+              {searchTerm ? "No students match your search." : "No students found."}
             </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {orderedSemesters.map((sem) => {
+              const list = studentsBySemester[sem] || [];
+              const isOpen = !!openSemesters[sem];
+              const label =
+                sem === "graduated"
+                  ? "Graduated Students"
+                  : sem === "unassigned"
+                  ? "Unassigned Semester"
+                  : `${sem} Semester`;
+
+              const allInSemSelected =
+                list.length > 0 && list.every((s) => selectedStudents.includes(s._id));
+
+              return (
+                <div
+                  key={sem}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
+                >
+                  {/* Semester Header */}
+                  <div className="flex items-center justify-between px-4 sm:px-6 py-4 bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 transition">
+                    <button
+                      onClick={() => toggleSemester(sem)}
+                      className="flex items-center gap-3 flex-1 text-left"
+                      aria-expanded={isOpen}
+                    >
+                      <span
+                        className={`flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+                          isOpen ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {isOpen ? <FiChevronUp /> : <FiChevronDown />}
+                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <FaGraduationCap className="text-blue-600 text-lg" />
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                          {label}
+                        </h3>
+                        <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          {list.length}
+                        </span>
+                      </div>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      {/* Quick select-all within this semester */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const ids = list.map((s) => s._id);
+                          const allSelected = ids.every((id) =>
+                            selectedStudents.includes(id)
+                          );
+                          if (allSelected) {
+                            setSelectedStudents((prev) =>
+                              prev.filter((id) => !ids.includes(id))
+                            );
+                          } else {
+                            setSelectedStudents((prev) => [
+                              ...new Set([...prev, ...ids]),
+                            ]);
+                          }
+                        }}
+                        className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition"
+                        title="Select all in this semester"
+                      >
+                        {allInSemSelected ? <FiCheckSquare /> : <FiSquare />}
+                        {allInSemSelected ? "Deselect" : "Select"}
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrint(sem);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-50 rounded transition"
+                        title={`Print ${label}`}
+                      >
+                        <FiPrinter /> Print
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Semester Body */}
+                  {isOpen && (
+                    <div className="border-t border-gray-100 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-600">
+                          <tr>
+                            <th className="px-3 py-2 text-left w-10"></th>
+                            <th className="px-3 py-2 text-left">Name</th>
+                            <th className="px-3 py-2 text-left">College ID</th>
+                            <th className="px-3 py-2 text-left">Blood</th>
+                            <th className="px-3 py-2 text-left">Phone</th>
+                            <th className="px-3 py-2 text-left">Email</th>
+                            <th className="px-3 py-2 text-left">Session</th>
+                            <th className="px-3 py-2 text-left">Status</th>
+                            <th className="px-3 py-2 text-left">Role</th>
+                            <th className="px-3 py-2 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {list.map((s) => {
+                            const checked = selectedStudents.includes(s._id);
+                            return (
+                              <tr
+                                key={s._id}
+                                className={`border-t border-gray-100 hover:bg-blue-50/40 transition ${
+                                  checked ? "bg-blue-50/60" : ""
+                                }`}
+                              >
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => toggleStudentSelection(s._id)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    aria-label="Select student"
+                                  >
+                                    {checked ? <FiCheckSquare /> : <FiSquare />}
+                                  </button>
+                                </td>
+                                <td className="px-3 py-2 font-medium text-gray-900">
+                                  {s.name}
+                                </td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {s.collegeId}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {s.bloodGroup ? (
+                                    <span className="inline-flex items-center gap-1 text-red-600 font-medium">
+                                      <FiDroplet /> {s.bloodGroup}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {s.phone || <span className="text-gray-400">—</span>}
+                                </td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {s.email || <span className="text-gray-400">—</span>}
+                                </td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {s.session || "—"}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      s.status === "active"
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-600"
+                                    }`}
+                                  >
+                                    {s.status || "—"}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 capitalize text-gray-700">
+                                  {s.role || "student"}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={() => openEditModal(s)}
+                                      className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
+                                      title="Edit"
+                                    >
+                                      <FiEdit2 />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteStudent(s._id)}
+                                      disabled={deletingStudentId === s._id}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded transition disabled:opacity-50"
+                                      title="Delete"
+                                    >
+                                      <MdDelete />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Edit Modal */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">
+      {/* ===== Edit Modal ===== */}
+      {isEditModalOpen && editingStudent && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FiEdit2 className="text-blue-600" />
                 Edit Student
               </h2>
-              {/* Message Display */}
-              {message.text && (
-                <div
-                  className={`mb-6 p-4 rounded-lg ${
-                    message.type === "success"
-                      ? "bg-green-50 text-green-800 border border-green-200"
-                      : "bg-red-50 text-red-800 border border-red-200"
-                  }`}
-                >
-                  {message.text}
-                </div>
-              )}
               <button
                 onClick={closeEditModal}
-                className="text-gray-400 hover:text-gray-600 transition"
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition"
               >
-                <FiX size={24} />
+                <FiX />
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium">
@@ -952,7 +1090,6 @@ export default function StudentManagement() {
                     name="name"
                     value={editFormData.name}
                     onChange={handleEditInputChange}
-                    required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   />
                 </div>
@@ -963,90 +1100,72 @@ export default function StudentManagement() {
                   </label>
                   <input
                     type="text"
-                    name="collegeId"
                     value={editFormData.collegeId}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
                     disabled
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    College ID cannot be changed
-                  </p>
                 </div>
 
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                    <FiPhone className="text-gray-500" />
-                    Phone Number
+                    <FiPhone className="text-gray-500" /> Phone
                   </label>
                   <input
                     type="tel"
                     name="phone"
                     value={editFormData.phone}
                     onChange={handleEditInputChange}
-                    pattern="01[3-9]\d{8}"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                    placeholder="e.g., 017xxxxxxxx"
                   />
                 </div>
 
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                    <FiMail className="text-gray-500" />
-                    Email{" "}
-                    {editFormData.role === "cr" && (
-                      <span className="text-red-500 text-xs">
-                        *Required for CR
-                      </span>
-                    )}
+                    <FiMail className="text-gray-500" /> Email
                   </label>
                   <input
                     type="email"
                     name="email"
                     value={editFormData.email}
                     onChange={handleEditInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 ${
-                      editFormData.role === "cr" && !editFormData.email
-                        ? "border-red-500 focus:ring-red-500"
-                        : "border-gray-300"
-                    }`}
-                    placeholder="student@example.com"
-                    required={editFormData.role === "cr"}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   />
-                  {editFormData.role === "cr" && !editFormData.email && (
-                    <p className="text-xs text-red-500 mt-1">
-                      Email is required for Class Representative
-                    </p>
-                  )}
                 </div>
 
-                {editFormData.role === "cr" && (
-                  <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                      <FiLock className="text-gray-500" />
-                      Password{" "}
-                      {!editingStudent?.password && (
-                        <span className="text-red-500 text-xs">
-                          *Auto-generated if empty
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      name="password"
-                      value={editFormData.password}
-                      onChange={handleEditInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                      placeholder="Leave empty to auto-generate"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      If left empty, a random password will be generated and
-                      sent via email.
-                    </p>
-                  </div>
-                )}
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">
-                    Semester
+                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                    <FiLock className="text-gray-500" /> New Password (leave blank to keep)
+                  </label>
+                  <input
+                    type="text"
+                    name="password"
+                    value={editFormData.password}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                    placeholder="Leave blank to keep current"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                    <FiDroplet className="text-red-500" /> Blood Group
+                  </label>
+                  <select
+                    name="bloodGroup"
+                    value={editFormData.bloodGroup}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                  >
+                    <option value="">Not specified</option>
+                    {BLOOD_GROUPS.map((bg) => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                    <IoCalendarOutline className="text-gray-500" /> Semester
                   </label>
                   <select
                     name="semester"
@@ -1054,37 +1173,27 @@ export default function StudentManagement() {
                     onChange={handleEditInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   >
-                    <option value="1st">1st Semester</option>
-                    <option value="2nd">2nd Semester</option>
-                    <option value="3rd">3rd Semester</option>
-                    <option value="4th">4th Semester</option>
-                    <option value="5th">5th Semester</option>
-                    <option value="6th">6th Semester</option>
-                    <option value="7th">7th Semester</option>
-                    <option value="8th">8th Semester</option>
-                    <option value="graduated">Graduated</option>
+                    {["1st","2nd","3rd","4th","5th","6th","7th","8th","graduated"].map((s) => (
+                      <option key={s} value={s}>
+                        {s === "graduated" ? "Graduated" : `${s} Semester`}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">
-                    Session
-                  </label>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">Session</label>
                   <input
                     type="text"
                     name="session"
                     value={editFormData.session}
                     onChange={handleEditInputChange}
-                    pattern="\d{4}-\d{2,4}"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                    placeholder="e.g., 2021-22 or 2021-2022"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">
-                    Status
-                  </label>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">Status</label>
                   <select
                     name="status"
                     value={editFormData.status}
@@ -1093,15 +1202,11 @@ export default function StudentManagement() {
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
-                    <option value="graduated">Graduated</option>
-                    <option value="suspended">Suspended</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">
-                    Role
-                  </label>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">Role</label>
                   <select
                     name="role"
                     value={editFormData.role}
@@ -1109,23 +1214,23 @@ export default function StudentManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   >
                     <option value="student">Student</option>
-                    <option value="cr">Class Representative</option>
+                    <option value="cr">CR</option>
                   </select>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 sticky bottom-0">
               <button
                 onClick={closeEditModal}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition font-medium"
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50 font-medium flex items-center gap-2"
               >
                 <FiSave />
                 {loading ? "Saving..." : "Save Changes"}
