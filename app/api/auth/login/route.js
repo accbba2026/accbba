@@ -2,18 +2,22 @@
 import { connectToDatabase } from '@/app/lib/mongodb';
 import User from '@/app/models/User';
 import { NextResponse } from 'next/server';
-import { generateToken, setAuthCookie } from '@/app/lib/authUtils';
+import {
+  generateToken,
+  setAuthCookie,
+  generateSessionToken,
+} from '@/app/lib/authUtils';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request) {
   try {
     await connectToDatabase();
-    
+
     const body = await request.json();
     const { loginType, collegeId, password, email } = body;
-    
+
     let user = null;
-    
+
     // Student Login - Only College ID
     if (loginType === 'student') {
       if (!collegeId) {
@@ -22,12 +26,12 @@ export async function POST(request) {
           { status: 400 }
         );
       }
-      
-      user = await User.findOne({ 
+
+      user = await User.findOne({
         collegeId: collegeId,
-        role: { $in: ['student'] }
+        role: { $in: ['student'] },
       });
-      
+
       if (!user) {
         return NextResponse.json(
           { success: false, message: 'Invalid College ID' },
@@ -35,7 +39,7 @@ export async function POST(request) {
         );
       }
     }
-    
+
     // CR Login - College ID + Password
     else if (loginType === 'cr') {
       if (!collegeId || !password) {
@@ -44,19 +48,19 @@ export async function POST(request) {
           { status: 400 }
         );
       }
-      
-      user = await User.findOne({ 
+
+      user = await User.findOne({
         collegeId: collegeId,
-        role: 'cr'
+        role: 'cr',
       }).select('+password');
-      
+
       if (!user) {
         return NextResponse.json(
           { success: false, message: 'Invalid College ID or password' },
           { status: 401 }
         );
       }
-      
+
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
         return NextResponse.json(
@@ -65,7 +69,7 @@ export async function POST(request) {
         );
       }
     }
-    
+
     // Admin/Faculty Login - Email + Password
     else if (loginType === 'admin') {
       if (!email || !password) {
@@ -74,19 +78,19 @@ export async function POST(request) {
           { status: 400 }
         );
       }
-      
-      user = await User.findOne({ 
+
+      user = await User.findOne({
         email: email.toLowerCase(),
-        role: { $in: ['admin', 'faculty'] }
+        role: { $in: ['admin', 'faculty'] },
       }).select('+password');
-      
+
       if (!user) {
         return NextResponse.json(
           { success: false, message: 'Invalid email or password' },
           { status: 401 }
         );
       }
-      
+
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
         return NextResponse.json(
@@ -94,23 +98,30 @@ export async function POST(request) {
           { status: 401 }
         );
       }
-    }
-    
-    else {
+    } else {
       return NextResponse.json(
         { success: false, message: 'Invalid login type' },
         { status: 400 }
       );
     }
-    
-    // Update last login
+
+    // ✅ Check if account is active
+    if (user.status !== 'active') {
+      return NextResponse.json(
+        { success: false, message: 'Account is deactivated' },
+        { status: 403 }
+      );
+    }
+
+    // ✅ Generate NEW session token (invalidates all other devices)
+    user.sessionToken = generateSessionToken();
     user.lastLogin = new Date();
     await user.save();
-    
-    // Generate token and set cookie - AWAIT the async function
+
+    // ✅ Generate JWT with the new sessionToken embedded
     const token = generateToken(user);
-    await setAuthCookie(token); // Added 'await' here
-    
+    await setAuthCookie(token);
+
     // Return user info (excluding sensitive data)
     const userData = {
       id: user._id,
@@ -121,14 +132,13 @@ export async function POST(request) {
       email: user.email,
       role: user.role,
     };
-    
+
     return NextResponse.json({
       success: true,
       message: 'Login successful',
       user: userData,
-      redirect: getRedirectPath(user.role)
+      redirect: getRedirectPath(user.role),
     });
-    
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
@@ -139,7 +149,7 @@ export async function POST(request) {
 }
 
 function getRedirectPath(role) {
-  switch(role) {
+  switch (role) {
     case 'admin':
       return '/admin/dashboard';
     case 'faculty':

@@ -282,7 +282,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setLoginType("student")}
-                className={`flex-1 py-2 rounded-md transition ${
+                className={`flex-1 py-2 text-xs md:text-sm rounded-md transition ${
                   loginType === "student"
                     ? "bg-blue-600 text-white"
                     : "text-gray-600 hover:bg-gray-200"
@@ -293,7 +293,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setLoginType("cr")}
-                className={`flex-1 py-2 rounded-md transition ${
+                className={`flex-1 py-2 text-xs md:text-sm rounded-md transition ${
                   loginType === "cr"
                     ? "bg-blue-600 text-white"
                     : "text-gray-600 hover:bg-gray-200"
@@ -304,7 +304,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setLoginType("admin")}
-                className={`flex-1 py-2 rounded-md transition ${
+                className={`flex-1 py-2 text-xs md:text-sm rounded-md transition ${
                   loginType === "admin"
                     ? "bg-blue-600 text-white"
                     : "text-gray-600 hover:bg-gray-200"

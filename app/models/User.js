@@ -32,6 +32,9 @@ const userSchema = new mongoose.Schema(
     semester: {
       type: String,
     },
+    bloodGroup: {
+      type: String,
+    },
     designation: {
       type: String,
     },
@@ -43,6 +46,14 @@ const userSchema = new mongoose.Schema(
       required: true,
       enum: ["student", "admin", "faculty", "cr"],
       default: "student",
+    },
+    isDepthead: {
+      type: Boolean,
+      default: false,
+    },
+    sessionToken: {
+      type: String,
+      default: null, // Store the current session token
     },
   },
   {

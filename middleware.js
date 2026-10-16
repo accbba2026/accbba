@@ -40,6 +40,7 @@ const apiPermissions = {
 
   // Public APIs (no authentication needed)
   publicApis: [
+    "/api/auth/me",
     "/api/auth/login",
     "/api/auth/forgot-password",
     "/api/auth/verify-otp",
@@ -55,9 +56,9 @@ const apiPermissions = {
     "/api/user/update-profile",
     "/api/user/change-password",
     "/api/student/assignments",
-     "/api/student/assignment-submitted",
-     "/api/student/attendance",
-     "/api/auth/logout",
+    "/api/student/assignment-submitted",
+    "/api/student/attendance",
+    "/api/auth/logout",
   ],
 };
 

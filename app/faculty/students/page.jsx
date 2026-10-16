@@ -633,29 +633,6 @@ export default function StudentManagement() {
                     </button>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                    <IoCalendarOutline className="text-green-600" />
-                    Update Session
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={bulkSession}
-                      onChange={(e) => setBulkSession(e.target.value)}
-                      placeholder="e.g., 2021-22 or 2021-2022"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900"
-                    />
-                    <button
-                      onClick={handleBulkSessionUpdate}
-                      disabled={loading || selectedStudents.length === 0}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
-                    >
-                      Update
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {selectedStudents.length > 0 && (
