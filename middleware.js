@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
 // Use a proper JWT secret (should match your authUtils.js)
-const JWT_SECRET = new TextEncoder().encode("bba-is-awesome");
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 // API Route Permissions Configuration
 // Define which roles can access which API endpoints
