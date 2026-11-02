@@ -22,6 +22,22 @@ const attendanceSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    sessionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ClassSession",
+      default: null, // null for 1st–6th semester
+    },
+    major: {
+      type: String,
+      enum: [
+        "finance & banking",
+        "marketing",
+        "management",
+        "accounting",
+        null,
+      ],
+      default: null, // null for 1st–6th semester
+    },
   },
   {
     timestamps: true,
@@ -30,6 +46,13 @@ const attendanceSchema = new mongoose.Schema(
 
 // Create indexes for better query performance
 attendanceSchema.index({ createdAt: -1 });
+attendanceSchema.index(
+  { sessionId: 1, studentId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { sessionId: { $type: "objectId" } },
+  },
+);
 
 const Attendance =
   mongoose.models.Attendance || mongoose.model("Attendance", attendanceSchema);

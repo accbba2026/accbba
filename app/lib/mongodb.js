@@ -6,7 +6,7 @@ import dns from 'dns';
 dns.setDefaultResultOrder('ipv4first');
 
 // Use all three shards with their correct IPs (via hostnames)
-const MONGODB_URI = "mongodb://accbba2026:FJNwWXffYlStMK6f@ac-dcmut4m-shard-00-00.n9oqjau.mongodb.net:27017,ac-dcmut4m-shard-00-01.n9oqjau.mongodb.net:27017,ac-dcmut4m-shard-00-02.n9oqjau.mongodb.net:27017/departmentofbba?ssl=true&replicaSet=atlas-fegf08-shard-0&authSource=admin&retryWrites=true&w=majority";
+const MONGODB_URI = process.env.MONGODB_URI;
 
 let cached = global.mongoose;
 

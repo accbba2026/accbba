@@ -18,14 +18,26 @@ import {
   FiLock,
   FiPrinter,
   FiDroplet,
+  FiBriefcase,
+  FiMessageSquare,
+  FiTrash2,
+  FiPlus,
+  FiSend,
 } from "react-icons/fi";
 import { IoCalendarOutline } from "react-icons/io5";
-import { FaGraduationCap, FaUserGraduate } from "react-icons/fa";
+import { FaGraduationCap, FaUserGraduate, FaUserTie } from "react-icons/fa";
 import { HiOutlineUserGroup } from "react-icons/hi";
 import { MdDelete } from "react-icons/md";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const MAJOR_OPTIONS = [
+  "finance & banking",
+  "marketing",
+  "management",
+  "accounting",
+];
+const SENIOR_SEMESTERS = ["7th", "8th"];
 const SEMESTER_ORDER = [
   "1st",
   "2nd",
@@ -61,11 +73,10 @@ export default function StudentManagement() {
   const [message, setMessage] = useState({ type: "", text: "" });
   const [studentFetchLoad, setStudentFetchLoad] = useState(false);
 
-  // Search state
   const [searchTerm, setSearchTerm] = useState("");
   const [searchType, setSearchType] = useState("name");
 
-  // Edit modal state
+  // Edit modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [editFormData, setEditFormData] = useState({
@@ -75,95 +86,35 @@ export default function StudentManagement() {
     email: "",
     password: "",
     bloodGroup: "",
+    major: "",
     semester: "",
     session: "",
     status: "",
     role: "",
   });
 
-  // Collapsible sections
+  // Comments
+  const [commentModalStudent, setCommentModalStudent] = useState(null);
+  const [commentText, setCommentText] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState(null);
+
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [isBulkOperationsOpen, setIsBulkOperationsOpen] = useState(false);
-
-  // ✅ Semester collapse state — empty object means ALL collapsed by default
   const [openSemesters, setOpenSemesters] = useState({});
-
   const [deletingStudentId, setDeletingStudentId] = useState(null);
 
-const handleDeleteStudent = async (studentId) => {
-  // Confirm dialog via toast
-  const confirmed = await new Promise((resolve) => {
-    toast(
-      (t) => (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium text-white">
-            Delete this student? This action cannot be undone.
-          </p>
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={() => {
-                toast.dismiss(t.id);
-                resolve(false);
-              }}
-              className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                toast.dismiss(t.id);
-                resolve(true);
-              }}
-              className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ),
-      { duration: 10000, position: 'top-center' }
-    );
-  });
-
-  if (!confirmed) return;
-
-  setDeletingStudentId(studentId);
-  const toastId = toast.loading('Deleting student...');
-
-  try {
-    const response = await fetch('/api/user/delete-student', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: studentId }),
-    });
-    const data = await response.json();
-
-    if (data.success) {
-      toast.success('Student deleted successfully!', { id: toastId });
-      fetchStudents();
-      fetchSemesterStats();
-    } else {
-      toast.error(data.message || 'Failed to delete student.', { id: toastId });
-    }
-  } catch (error) {
-    console.error('Error deleting student:', error);
-    toast.error('An error occurred while deleting the student.', { id: toastId });
-  } finally {
-    setDeletingStudentId(null);
-  }
-};
-
-  useEffect(() => {
-    fetchStudents();
-    fetchSemesterStats();
-  }, []);
-
+  // ---------- fetch ----------
   const fetchStudents = async () => {
     try {
       setStudentFetchLoad(true);
       const response = await fetch("/api/user/get-students");
       const data = await response.json();
-      if (data.success) setStudents(data.data);
+      if (data.success) {
+        setStudents(
+          data.data.map((s) => ({ ...s, comments: s.comments || [] })),
+        );
+      }
     } catch (error) {
       console.error("Error fetching students:", error);
     } finally {
@@ -173,7 +124,9 @@ const handleDeleteStudent = async (studentId) => {
 
   const fetchSemesterStats = async () => {
     try {
-      const response = await fetch("/api/user/bulk-update-semester?action=stats");
+      const response = await fetch(
+        "/api/user/bulk-update-semester?action=stats",
+      );
       const data = await response.json();
       if (data.success) setSemesterStats(data.data);
     } catch (error) {
@@ -181,20 +134,24 @@ const handleDeleteStudent = async (studentId) => {
     }
   };
 
-  // Filter students
+  useEffect(() => {
+    fetchStudents();
+    fetchSemesterStats();
+  }, []);
+
+  // ---------- search ----------
   const filteredStudents = students.filter((student) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-
-    if (searchType === "name") return student.name.toLowerCase().includes(term);
+    if (searchType === "name")
+      return student.name?.toLowerCase().includes(term);
     if (searchType === "collegeId")
       return student.collegeId?.toString().includes(searchTerm);
-    if (searchType === "phone")
-      return student.phone && student.phone.includes(searchTerm);
+    if (searchType === "phone") return student.phone?.includes(searchTerm);
     if (searchType === "email")
-      return student.email && student.email.toLowerCase().includes(term);
+      return student.email?.toLowerCase().includes(term);
     if (searchType === "bloodGroup")
-      return student.bloodGroup && student.bloodGroup.toLowerCase() === term;
+      return student.bloodGroup?.toLowerCase() === term;
     return true;
   });
 
@@ -205,15 +162,9 @@ const handleDeleteStudent = async (studentId) => {
     return acc;
   }, {});
 
-  // ✅ Toggle a semester open/closed
   const toggleSemester = (semester) => {
-    setOpenSemesters((prev) => ({
-      ...prev,
-      [semester]: !prev[semester],
-    }));
+    setOpenSemesters((prev) => ({ ...prev, [semester]: !prev[semester] }));
   };
-
-  // ✅ Expand all / Collapse all
   const expandAll = () => {
     const all = {};
     Object.keys(studentsBySemester).forEach((s) => (all[s] = true));
@@ -221,15 +172,13 @@ const handleDeleteStudent = async (studentId) => {
   };
   const collapseAll = () => setOpenSemesters({});
 
-  const handleInputChange = (e) => {
+  // ---------- CRUD ----------
+  const handleInputChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMessage({ type: "", text: "" });
-
     try {
       const response = await fetch("/api/user/create-student", {
         method: "POST",
@@ -237,27 +186,24 @@ const handleDeleteStudent = async (studentId) => {
         body: JSON.stringify(formData),
       });
       const data = await response.json();
-
       if (data.success) {
-       toast.success('Student added successfully!');
+        toast.success("Student added successfully!");
         setFormData({
           name: "",
           collegeId: "",
           phone: "",
           email: "",
           bloodGroup: "",
-          semester: "1st",
-          session: "2024-25",
           status: "active",
           role: "student",
         });
         fetchStudents();
         fetchSemesterStats();
       } else {
-       toast.error(data.message || 'Failed to add student');
+        toast.error(data.message || "Failed to add student");
       }
-    } catch (error) {
-      toast.error('An error occurred while adding the student.');
+    } catch {
+      toast.error("An error occurred while adding the student.");
     } finally {
       setLoading(false);
     }
@@ -272,6 +218,7 @@ const handleDeleteStudent = async (studentId) => {
       email: student.email || "",
       password: "",
       bloodGroup: student.bloodGroup || "",
+      major: student.major || "",
       semester: student.semester || "",
       session: student.session || "2024-25",
       status: student.status || "active",
@@ -290,6 +237,7 @@ const handleDeleteStudent = async (studentId) => {
       email: "",
       password: "",
       bloodGroup: "",
+      major: "",
       semester: "",
       session: "",
       status: "",
@@ -297,9 +245,8 @@ const handleDeleteStudent = async (studentId) => {
     });
   };
 
-  const handleEditInputChange = (e) => {
+  const handleEditInputChange = (e) =>
     setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
-  };
 
   const handleSaveEdit = async () => {
     if (editFormData.role === "cr") {
@@ -309,43 +256,124 @@ const handleDeleteStudent = async (studentId) => {
       }
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailPattern.test(editFormData.email)) {
-        setMessage({ type: "error", text: "Please enter a valid email address for CR" });
+        setMessage({
+          type: "error",
+          text: "Please enter a valid email address for CR",
+        });
         return;
       }
     }
 
+    const isSenior = SENIOR_SEMESTERS.includes(editFormData.semester);
+    const wasSenior = SENIOR_SEMESTERS.includes(editingStudent?.semester);
+
     setLoading(true);
     try {
+      const payload = {
+        id: editingStudent._id,
+        name: editFormData.name,
+        phone: editFormData.phone,
+        email: editFormData.email,
+        password: editFormData.password,
+        bloodGroup: editFormData.bloodGroup,
+        semester: editFormData.semester,
+        session: editFormData.session,
+        status: editFormData.status,
+        role: editFormData.role,
+        // ✅ Send major only when relevant
+        ...(isSenior ? { major: editFormData.major || "" } : {}),
+      };
+
       const response = await fetch("/api/user/update-student", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingStudent._id,
-          name: editFormData.name,
-          phone: editFormData.phone,
-          email: editFormData.email,
-          password: editFormData.password,
-          bloodGroup: editFormData.bloodGroup,
-          semester: editFormData.semester,
-          session: editFormData.session,
-          status: editFormData.status,
-          role: editFormData.role,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
       if (data.success) {
-        setMessage({ type: "success", text: "Student updated successfully!" });
+        let successMsg = "Student updated successfully!";
+        if (wasSenior && !isSenior) {
+          successMsg =
+            "Student updated. Major was cleared because the semester changed below 7th.";
+        }
+        setMessage({ type: "success", text: successMsg });
+        toast.success(successMsg);
         closeEditModal();
         fetchStudents();
         fetchSemesterStats();
       } else {
-        setMessage({ type: "error", text: data.message || "Failed to update student" });
+        setMessage({
+          type: "error",
+          text: data.message || "Failed to update student",
+        });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "An error occurred" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteStudent = async (studentId) => {
+    const confirmed = await new Promise((resolve) => {
+      toast(
+        (t) => (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-white">
+              Delete this student? This action cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  resolve(false);
+                }}
+                className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  resolve(true);
+                }}
+                className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: 10000, position: "top-center" },
+      );
+    });
+    if (!confirmed) return;
+
+    setDeletingStudentId(studentId);
+    const toastId = toast.loading("Deleting student...");
+    try {
+      const response = await fetch("/api/user/delete-student", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: studentId }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success("Student deleted successfully!", { id: toastId });
+        fetchStudents();
+        fetchSemesterStats();
+      } else {
+        toast.error(data.message || "Failed to delete student.", {
+          id: toastId,
+        });
+      }
+    } catch {
+      toast.error("An error occurred while deleting the student.", {
+        id: toastId,
+      });
+    } finally {
+      setDeletingStudentId(null);
     }
   };
 
@@ -359,7 +387,10 @@ const handleDeleteStudent = async (studentId) => {
       const response = await fetch("/api/user/bulk-update-semester", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetSemester: bulkSemester, studentIds: selectedStudents }),
+        body: JSON.stringify({
+          targetSemester: bulkSemester,
+          studentIds: selectedStudents,
+        }),
       });
       const data = await response.json();
       if (data.success) {
@@ -371,7 +402,7 @@ const handleDeleteStudent = async (studentId) => {
       } else {
         setMessage({ type: "error", text: data.message });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "An error occurred" });
     } finally {
       setLoading(false);
@@ -388,7 +419,10 @@ const handleDeleteStudent = async (studentId) => {
       const response = await fetch("/api/user/bulk-update-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetSession: bulkSession, studentIds: selectedStudents }),
+        body: JSON.stringify({
+          targetSession: bulkSession,
+          studentIds: selectedStudents,
+        }),
       });
       const data = await response.json();
       if (data.success) {
@@ -400,18 +434,19 @@ const handleDeleteStudent = async (studentId) => {
       } else {
         setMessage({ type: "error", text: data.message });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "An error occurred" });
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleStudentSelection = (studentId) => {
+  const toggleStudentSelection = (studentId) =>
     setSelectedStudents((prev) =>
-      prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId]
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId],
     );
-  };
 
   const selectAllStudents = () => {
     if (selectedStudents.length === filteredStudents.length) {
@@ -421,7 +456,7 @@ const handleDeleteStudent = async (studentId) => {
     }
   };
 
-  // ✅ Print a single semester (or the whole filtered list)
+  // ---------- print ----------
   const handlePrint = (semesterFilter = null) => {
     const studentsToPrint = semesterFilter
       ? students.filter((s) => s.semester === semesterFilter)
@@ -446,6 +481,11 @@ const handleDeleteStudent = async (studentId) => {
       return;
     }
 
+    // ✅ Show Major column only when at least one printed student is 7th/8th
+    const showMajor = studentsToPrint.some((s) =>
+      SENIOR_SEMESTERS.includes(s.semester),
+    );
+
     const rowsHtml = studentsToPrint
       .map(
         (s, idx) => `
@@ -454,13 +494,14 @@ const handleDeleteStudent = async (studentId) => {
           <td>${s.name || "—"}</td>
           <td>${s.collegeId || "—"}</td>
           <td>${s.bloodGroup || "—"}</td>
+          ${showMajor ? `<td class="major">${s.major || "—"}</td>` : ""}
           <td>${s.phone || "—"}</td>
           <td>${s.email || "—"}</td>
           <td>${s.session || "—"}</td>
           <td>${s.semester || "—"}</td>
           <td>${s.status || "—"}</td>
           <td>${s.role || "—"}</td>
-        </tr>`
+        </tr>`,
       )
       .join("");
 
@@ -486,7 +527,7 @@ const handleDeleteStudent = async (studentId) => {
             th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
             th { font-weight: 600; }
             tbody tr:nth-child(even) { background: #f9fafb; }
-            tbody tr:hover { background: #eff6ff; }
+            td.major { text-transform: capitalize; }
             .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #666; border-top: 1px solid #e5e7eb; padding-top: 12px; }
             @media print {
               body { padding: 12px; }
@@ -512,6 +553,7 @@ const handleDeleteStudent = async (studentId) => {
                 <th>Name</th>
                 <th>College ID</th>
                 <th>Blood Group</th>
+                ${showMajor ? `<th>Major</th>` : ""}
                 <th>Phone</th>
                 <th>Email</th>
                 <th>Session</th>
@@ -534,42 +576,151 @@ const handleDeleteStudent = async (studentId) => {
     printWindow.document.close();
   };
 
-  // ✅ Get semester stats (from API) or fallback to computed counts
+  // ---------- comments ----------
+  const openCommentModal = (student) => {
+    setCommentModalStudent(student);
+    setCommentText("");
+  };
+  const closeCommentModal = () => {
+    setCommentModalStudent(null);
+    setCommentText("");
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim()) {
+      toast.error("Comment cannot be empty");
+      return;
+    }
+    setCommentLoading(true);
+    const toastId = toast.loading("Adding comment...");
+    try {
+      const res = await fetch("/api/user/add-comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: commentModalStudent._id,
+          text: commentText,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Comment added", { id: toastId });
+        // update in place
+        setStudents((prev) =>
+          prev.map((s) =>
+            s._id === commentModalStudent._id
+              ? { ...s, comments: [...(s.comments || []), data.data] }
+              : s,
+          ),
+        );
+        setCommentModalStudent((prev) => ({
+          ...prev,
+          comments: [...(prev.comments || []), data.data],
+        }));
+        setCommentText("");
+      } else {
+        toast.error(data.message || "Failed to add comment", { id: toastId });
+      }
+    } catch {
+      toast.error("Error adding comment", { id: toastId });
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const handleDeleteComment = async (studentId, commentId) => {
+    const confirmed = window.confirm("Delete this comment?");
+    if (!confirmed) return;
+
+    setDeletingCommentId(commentId);
+    const toastId = toast.loading("Deleting comment...");
+    try {
+      const res = await fetch("/api/user/delete-comment", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, commentId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Comment deleted", { id: toastId });
+        const updatedComments = (commentModalStudent.comments || []).filter(
+          (c) => c._id !== commentId,
+        );
+        setCommentModalStudent((prev) => ({
+          ...prev,
+          comments: updatedComments,
+        }));
+        setStudents((prev) =>
+          prev.map((s) =>
+            s._id === studentId ? { ...s, comments: updatedComments } : s,
+          ),
+        );
+      } else {
+        toast.error(data.message || "Failed to delete comment", {
+          id: toastId,
+        });
+      }
+    } catch {
+      toast.error("Error deleting comment", { id: toastId });
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  // ---------- stats & ordering ----------
   const getSemesterCount = (sem) => {
     const stat = semesterStats.find(
       (s) =>
         (s._id || s.semester || "").toString().toLowerCase() ===
-        sem.toString().toLowerCase()
+        sem.toString().toLowerCase(),
     );
     if (stat && stat.count != null) return stat.count;
     return studentsBySemester[sem]?.length || 0;
   };
 
-  // ✅ Ordered list of semesters we actually have
   const orderedSemesters = SEMESTER_ORDER.filter(
-    (s) => studentsBySemester[s] && studentsBySemester[s].length > 0
+    (s) => studentsBySemester[s] && studentsBySemester[s].length > 0,
   );
-  // Include any semesters not in the predefined order (safety)
   Object.keys(studentsBySemester).forEach((s) => {
     if (!orderedSemesters.includes(s)) orderedSemesters.push(s);
   });
 
+  const formatDate = (d) => {
+    if (!d) return "—";
+    const dt = new Date(d);
+    return (
+      dt.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }) +
+      " · " +
+      dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    );
+  };
+
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
+        {/* Header */}
         <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <FaUserGraduate className="text-3xl text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">Student Management</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Student Management
+              </h1>
             </div>
             <p className="text-gray-600 ml-11">
-              Manage students, update semesters, and track academic progress
+              Manage students, update semesters, majors, and add faculty
+              comments
             </p>
           </div>
         </div>
 
-        {/* Message */}
         {message.text && (
           <div
             className={`mb-6 p-4 rounded-lg ${
@@ -582,7 +733,7 @@ const handleDeleteStudent = async (studentId) => {
           </div>
         )}
 
-        {/* Add Student Form - Collapsible */}
+        {/* Add Student */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
           <button
             onClick={() => setIsAddFormOpen(!isAddFormOpen)}
@@ -590,9 +741,15 @@ const handleDeleteStudent = async (studentId) => {
           >
             <div className="flex items-center gap-3">
               <FiUserPlus className="text-xl text-blue-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Add New Student</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Add New Student
+              </h2>
             </div>
-            {isAddFormOpen ? <FiChevronUp className="text-gray-500" /> : <FiChevronDown className="text-gray-500" />}
+            {isAddFormOpen ? (
+              <FiChevronUp className="text-gray-500" />
+            ) : (
+              <FiChevronDown className="text-gray-500" />
+            )}
           </button>
 
           {isAddFormOpen && (
@@ -600,7 +757,9 @@ const handleDeleteStudent = async (studentId) => {
               <form onSubmit={handleSubmit}>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">Full Name *</label>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">
+                      Full Name *
+                    </label>
                     <input
                       type="text"
                       name="name"
@@ -611,9 +770,10 @@ const handleDeleteStudent = async (studentId) => {
                       placeholder="Enter student name"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">College ID (6 digits) *</label>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">
+                      College ID (6 digits) *
+                    </label>
                     <input
                       type="text"
                       name="collegeId"
@@ -625,10 +785,10 @@ const handleDeleteStudent = async (studentId) => {
                       placeholder="Enter 6-digit ID"
                     />
                   </div>
-
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                      <FiPhone className="text-gray-500" /> Phone Number (Optional)
+                      <FiPhone className="text-gray-500" /> Phone Number
+                      (Optional)
                     </label>
                     <input
                       type="tel"
@@ -640,7 +800,6 @@ const handleDeleteStudent = async (studentId) => {
                       placeholder="e.g., 017xxxxxxxx"
                     />
                   </div>
-
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
                       <FiMail className="text-gray-500" /> Email (Optional)
@@ -654,10 +813,10 @@ const handleDeleteStudent = async (studentId) => {
                       placeholder="student@example.com"
                     />
                   </div>
-
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                      <FiDroplet className="text-red-500" /> Blood Group (Optional)
+                      <FiDroplet className="text-red-500" /> Blood Group
+                      (Optional)
                     </label>
                     <select
                       name="bloodGroup"
@@ -667,27 +826,42 @@ const handleDeleteStudent = async (studentId) => {
                     >
                       <option value="">Not specified</option>
                       {BLOOD_GROUPS.map((bg) => (
-                        <option key={bg} value={bg}>{bg}</option>
+                        <option key={bg} value={bg}>
+                          {bg}
+                        </option>
                       ))}
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">Semester</label>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">
+                      Semester
+                    </label>
                     <select
                       name="semester"
                       value={formData.semester}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     >
-                      {["1st","2nd","3rd","4th","5th","6th","7th","8th"].map((s) => (
-                        <option key={s} value={s}>{s} Semester</option>
+                      {[
+                        "1st",
+                        "2nd",
+                        "3rd",
+                        "4th",
+                        "5th",
+                        "6th",
+                        "7th",
+                        "8th",
+                      ].map((s) => (
+                        <option key={s} value={s}>
+                          {s} Semester
+                        </option>
                       ))}
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-gray-700 mb-2 text-sm font-medium">Session</label>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium">
+                      Session
+                    </label>
                     <input
                       type="text"
                       name="session"
@@ -722,56 +896,56 @@ const handleDeleteStudent = async (studentId) => {
           >
             <div className="flex items-center gap-3">
               <HiOutlineUserGroup className="text-xl text-purple-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Bulk Operations</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Bulk Operations
+              </h2>
               {selectedStudents.length > 0 && (
                 <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">
                   {selectedStudents.length} selected
                 </span>
               )}
             </div>
-            {isBulkOperationsOpen ? <FiChevronUp className="text-gray-500" /> : <FiChevronDown className="text-gray-500" />}
+            {isBulkOperationsOpen ? (
+              <FiChevronUp className="text-gray-500" />
+            ) : (
+              <FiChevronDown className="text-gray-500" />
+            )}
           </button>
 
           {isBulkOperationsOpen && (
             <div className="px-6 pb-6 border-t border-gray-100 pt-4">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">Update Semester</label>
-                  <div className="flex gap-2">
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">
+                    Update Semester
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <select
                       value={bulkSemester}
                       onChange={(e) => setBulkSemester(e.target.value)}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
                     >
                       <option value="">Select Semester</option>
-                      {["1st","2nd","3rd","4th","5th","6th","7th","8th","graduated"].map((s) => (
-                        <option key={s} value={s}>{s === "graduated" ? "Graduated" : `${s} Semester`}</option>
+                      {[
+                        "1st",
+                        "2nd",
+                        "3rd",
+                        "4th",
+                        "5th",
+                        "6th",
+                        "7th",
+                        "8th",
+                        "graduated",
+                      ].map((s) => (
+                        <option key={s} value={s}>
+                          {s === "graduated" ? "Graduated" : `${s} Semester`}
+                        </option>
                       ))}
                     </select>
                     <button
                       onClick={handleBulkSemesterUpdate}
                       disabled={loading || selectedStudents.length === 0}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 font-medium"
-                    >
-                      Update
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">Update Session</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={bulkSession}
-                      onChange={(e) => setBulkSession(e.target.value)}
-                      placeholder="e.g., 2021-22"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
-                    />
-                    <button
-                      onClick={handleBulkSessionUpdate}
-                      disabled={loading || selectedStudents.length === 0}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 font-medium"
+                      className="w-full sm:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 font-medium"
                     >
                       Update
                     </button>
@@ -814,50 +988,50 @@ const handleDeleteStudent = async (studentId) => {
                 onClick={selectAllStudents}
                 className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium"
               >
-                {selectedStudents.length === filteredStudents.length && filteredStudents.length > 0 ? (
+                {selectedStudents.length === filteredStudents.length &&
+                filteredStudents.length > 0 ? (
                   <FiCheckSquare />
                 ) : (
                   <FiSquare />
                 )}
-                {selectedStudents.length === filteredStudents.length && filteredStudents.length > 0
+                {selectedStudents.length === filteredStudents.length &&
+                filteredStudents.length > 0
                   ? "Deselect All"
                   : "Select All"}
               </button>
-
               <button
                 onClick={expandAll}
                 className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition text-sm font-medium"
               >
                 <FiChevronDown /> Expand All
               </button>
-
               <button
                 onClick={collapseAll}
                 className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition text-sm font-medium"
               >
                 <FiChevronUp /> Collapse All
               </button>
-
               <button
                 onClick={() => handlePrint(null)}
                 className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm font-medium"
               >
                 <FiPrinter /> Print All
               </button>
-
               <button
                 onClick={fetchStudents}
                 disabled={studentFetchLoad}
                 className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium disabled:opacity-50"
               >
-                <FiRefreshCw className={studentFetchLoad ? "animate-spin" : ""} />
+                <FiRefreshCw
+                  className={studentFetchLoad ? "animate-spin" : ""}
+                />
                 Refresh
               </button>
             </div>
           </div>
         </div>
 
-        {/* ✅ Semester-wise Collapsible Sections */}
+        {/* Student list by semester */}
         {studentFetchLoad ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <FiRefreshCw className="animate-spin text-4xl text-blue-600 mx-auto mb-3" />
@@ -867,7 +1041,9 @@ const handleDeleteStudent = async (studentId) => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <FaUserGraduate className="text-5xl text-gray-300 mx-auto mb-3" />
             <p className="text-gray-600">
-              {searchTerm ? "No students match your search." : "No students found."}
+              {searchTerm
+                ? "No students match your search."
+                : "No students found."}
             </p>
           </div>
         ) : (
@@ -879,18 +1055,18 @@ const handleDeleteStudent = async (studentId) => {
                 sem === "graduated"
                   ? "Graduated Students"
                   : sem === "unassigned"
-                  ? "Unassigned Semester"
-                  : `${sem} Semester`;
+                    ? "Unassigned Semester"
+                    : `${sem} Semester`;
 
               const allInSemSelected =
-                list.length > 0 && list.every((s) => selectedStudents.includes(s._id));
+                list.length > 0 &&
+                list.every((s) => selectedStudents.includes(s._id));
 
               return (
                 <div
                   key={sem}
                   className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
                 >
-                  {/* Semester Header */}
                   <div className="flex items-center justify-between px-4 sm:px-6 py-4 bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 transition">
                     <button
                       onClick={() => toggleSemester(sem)}
@@ -899,7 +1075,9 @@ const handleDeleteStudent = async (studentId) => {
                     >
                       <span
                         className={`flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
-                          isOpen ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                          isOpen
+                            ? "bg-blue-600 text-white"
+                            : "bg-blue-100 text-blue-700"
                         }`}
                       >
                         {isOpen ? <FiChevronUp /> : <FiChevronDown />}
@@ -916,17 +1094,16 @@ const handleDeleteStudent = async (studentId) => {
                     </button>
 
                     <div className="flex items-center gap-2">
-                      {/* Quick select-all within this semester */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           const ids = list.map((s) => s._id);
                           const allSelected = ids.every((id) =>
-                            selectedStudents.includes(id)
+                            selectedStudents.includes(id),
                           );
                           if (allSelected) {
                             setSelectedStudents((prev) =>
-                              prev.filter((id) => !ids.includes(id))
+                              prev.filter((id) => !ids.includes(id)),
                             );
                           } else {
                             setSelectedStudents((prev) => [
@@ -935,26 +1112,22 @@ const handleDeleteStudent = async (studentId) => {
                           }
                         }}
                         className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition"
-                        title="Select all in this semester"
                       >
                         {allInSemSelected ? <FiCheckSquare /> : <FiSquare />}
                         {allInSemSelected ? "Deselect" : "Select"}
                       </button>
-
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePrint(sem);
                         }}
                         className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-50 rounded transition"
-                        title={`Print ${label}`}
                       >
                         <FiPrinter /> Print
                       </button>
                     </div>
                   </div>
 
-                  {/* Semester Body */}
                   {isOpen && (
                     <div className="border-t border-gray-100 overflow-x-auto">
                       <table className="w-full text-sm">
@@ -964,6 +1137,7 @@ const handleDeleteStudent = async (studentId) => {
                             <th className="px-3 py-2 text-left">Name</th>
                             <th className="px-3 py-2 text-left">College ID</th>
                             <th className="px-3 py-2 text-left">Blood</th>
+                            <th className="px-3 py-2 text-left">Major</th>
                             <th className="px-3 py-2 text-left">Phone</th>
                             <th className="px-3 py-2 text-left">Email</th>
                             <th className="px-3 py-2 text-left">Session</th>
@@ -975,6 +1149,10 @@ const handleDeleteStudent = async (studentId) => {
                         <tbody>
                           {list.map((s) => {
                             const checked = selectedStudents.includes(s._id);
+                            const isSenior = SENIOR_SEMESTERS.includes(
+                              s.semester,
+                            );
+                            const commentCount = s.comments?.length || 0;
                             return (
                               <tr
                                 key={s._id}
@@ -984,9 +1162,10 @@ const handleDeleteStudent = async (studentId) => {
                               >
                                 <td className="px-3 py-2">
                                   <button
-                                    onClick={() => toggleStudentSelection(s._id)}
+                                    onClick={() =>
+                                      toggleStudentSelection(s._id)
+                                    }
                                     className="text-blue-600 hover:text-blue-800"
-                                    aria-label="Select student"
                                   >
                                     {checked ? <FiCheckSquare /> : <FiSquare />}
                                   </button>
@@ -1006,11 +1185,24 @@ const handleDeleteStudent = async (studentId) => {
                                     <span className="text-gray-400">—</span>
                                   )}
                                 </td>
-                                <td className="px-3 py-2 text-gray-700">
-                                  {s.phone || <span className="text-gray-400">—</span>}
+                                <td className="px-3 py-2">
+                                  {isSenior && s.major ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 capitalize">
+                                      <FiBriefcase size={11} /> {s.major}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
                                 </td>
                                 <td className="px-3 py-2 text-gray-700">
-                                  {s.email || <span className="text-gray-400">—</span>}
+                                  {s.phone || (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {s.email || (
+                                    <span className="text-gray-400">—</span>
+                                  )}
                                 </td>
                                 <td className="px-3 py-2 text-gray-700">
                                   {s.session || "—"}
@@ -1031,6 +1223,18 @@ const handleDeleteStudent = async (studentId) => {
                                 </td>
                                 <td className="px-3 py-2">
                                   <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={() => openCommentModal(s)}
+                                      className="relative p-2 text-purple-600 hover:bg-purple-50 rounded transition"
+                                      title="Comments"
+                                    >
+                                      <FiMessageSquare />
+                                      {commentCount > 0 && (
+                                        <span className="absolute -top-0.5 -right-0.5 bg-purple-600 text-white text-[10px] rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center font-bold">
+                                          {commentCount}
+                                        </span>
+                                      )}
+                                    </button>
                                     <button
                                       onClick={() => openEditModal(s)}
                                       className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
@@ -1062,14 +1266,13 @@ const handleDeleteStudent = async (studentId) => {
         )}
       </div>
 
-      {/* ===== Edit Modal ===== */}
+      {/* ===== Edit Student Modal ===== */}
       {isEditModalOpen && editingStudent && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FiEdit2 className="text-blue-600" />
-                Edit Student
+                <FiEdit2 className="text-blue-600" /> Edit Student
               </h2>
               <button
                 onClick={closeEditModal}
@@ -1093,7 +1296,6 @@ const handleDeleteStudent = async (studentId) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   />
                 </div>
-
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium">
                     College ID
@@ -1105,7 +1307,6 @@ const handleDeleteStudent = async (studentId) => {
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500"
                   />
                 </div>
-
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
                     <FiPhone className="text-gray-500" /> Phone
@@ -1118,7 +1319,6 @@ const handleDeleteStudent = async (studentId) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   />
                 </div>
-
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
                     <FiMail className="text-gray-500" /> Email
@@ -1131,10 +1331,10 @@ const handleDeleteStudent = async (studentId) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   />
                 </div>
-
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
-                    <FiLock className="text-gray-500" /> New Password (leave blank to keep)
+                    <FiLock className="text-gray-500" /> New Password (leave
+                    blank to keep)
                   </label>
                   <input
                     type="text"
@@ -1145,7 +1345,6 @@ const handleDeleteStudent = async (studentId) => {
                     placeholder="Leave blank to keep current"
                   />
                 </div>
-
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
                     <FiDroplet className="text-red-500" /> Blood Group
@@ -1158,10 +1357,40 @@ const handleDeleteStudent = async (studentId) => {
                   >
                     <option value="">Not specified</option>
                     {BLOOD_GROUPS.map((bg) => (
-                      <option key={bg} value={bg}>{bg}</option>
+                      <option key={bg} value={bg}>
+                        {bg}
+                      </option>
                     ))}
                   </select>
                 </div>
+
+                {/* ✅ Major — only when semester is 7th / 8th */}
+                {SENIOR_SEMESTERS.includes(editFormData.semester) && (
+                  <div>
+                    <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                      <FiBriefcase className="text-indigo-500" /> Major Subject
+                    </label>
+                    <select
+                      name="major"
+                      value={editFormData.major}
+                      onChange={handleEditInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 capitalize"
+                    >
+                      <option value="">Not assigned</option>
+                      {MAJOR_OPTIONS.map((m) => (
+                        <option key={m} value={m}>
+                          {m
+                            .split(" ")
+                            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                            .join(" ")}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Required for 7th & 8th semester students
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
@@ -1173,16 +1402,33 @@ const handleDeleteStudent = async (studentId) => {
                     onChange={handleEditInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   >
-                    {["1st","2nd","3rd","4th","5th","6th","7th","8th","graduated"].map((s) => (
+                    {[
+                      "1st",
+                      "2nd",
+                      "3rd",
+                      "4th",
+                      "5th",
+                      "6th",
+                      "7th",
+                      "8th",
+                      "graduated",
+                    ].map((s) => (
                       <option key={s} value={s}>
                         {s === "graduated" ? "Graduated" : `${s} Semester`}
                       </option>
                     ))}
                   </select>
+                  {SENIOR_SEMESTERS.includes(editingStudent.semester) &&
+                    !SENIOR_SEMESTERS.includes(editFormData.semester) && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        ⚠ Major will be cleared (no longer 7th/8th)
+                      </p>
+                    )}
                 </div>
-
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">Session</label>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">
+                    Session
+                  </label>
                   <input
                     type="text"
                     name="session"
@@ -1191,9 +1437,10 @@ const handleDeleteStudent = async (studentId) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">Status</label>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">
+                    Status
+                  </label>
                   <select
                     name="status"
                     value={editFormData.status}
@@ -1204,9 +1451,10 @@ const handleDeleteStudent = async (studentId) => {
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-gray-700 mb-2 text-sm font-medium">Role</label>
+                  <label className="block text-gray-700 mb-2 text-sm font-medium">
+                    Role
+                  </label>
                   <select
                     name="role"
                     value={editFormData.role}
@@ -1235,6 +1483,108 @@ const handleDeleteStudent = async (studentId) => {
                 <FiSave />
                 {loading ? "Saving..." : "Save Changes"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Comments Modal ===== */}
+      {commentModalStudent && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            {/* header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <FiMessageSquare className="text-purple-600" /> Comments
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {commentModalStudent.name}{" "}
+                  <span className="text-gray-400">
+                    · {commentModalStudent.collegeId}
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={closeCommentModal}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition"
+              >
+                <FiX />
+              </button>
+            </div>
+
+            {/* list */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {(commentModalStudent.comments || []).length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <FiMessageSquare className="text-5xl text-gray-300 mx-auto mb-3" />
+                  <p>No comments yet. Be the first to add one.</p>
+                </div>
+              ) : (
+                [...(commentModalStudent.comments || [])].reverse().map((c) => (
+                  <div
+                    key={c._id}
+                    className="border border-gray-200 rounded-lg p-3 bg-gray-50 hover:bg-gray-100/70 transition"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                            <FaUserTie size={10} /> {c.authorName}
+                          </span>
+                          <span className="text-xs text-gray-500 capitalize">
+                            ({c.authorRole})
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            · {formatDate(c.date)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                          {c.text}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() =>
+                          handleDeleteComment(commentModalStudent._id, c._id)
+                        }
+                        disabled={deletingCommentId === c._id}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition disabled:opacity-50 shrink-0"
+                        title="Delete comment"
+                      >
+                        <FiTrash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* add */}
+            <div className="border-t border-gray-200 px-6 py-4 shrink-0 bg-white">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Add a comment
+              </label>
+              <div className="flex gap-2">
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  rows={2}
+                  maxLength={1000}
+                  placeholder="Write a note about this student..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900 resize-none"
+                />
+                <button
+                  onClick={handleAddComment}
+                  disabled={commentLoading || !commentText.trim()}
+                  className="self-end px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition disabled:opacity-50 font-medium flex items-center gap-2"
+                >
+                  <FiSend />
+                  {commentLoading ? "..." : "Add"}
+                </button>
+              </div>
+              <div className="text-right text-xs text-gray-400 mt-1">
+                {commentText.length}/1000
+              </div>
             </div>
           </div>
         </div>

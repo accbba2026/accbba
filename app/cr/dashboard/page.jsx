@@ -16,9 +16,9 @@ const Page = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl text-center font-bold text-gray-900">CR/ACR Dashboard</h1>
-          <p className="text-gray-600 text-center mt-1">Welcome back, CR/ACR</p>
+        <div className="mb-1">
+          <h1 className="text-lg md:text-3xl text-center font-bold text-gray-900">CR/ACR Dashboard</h1>
+          <p className="text-md md:text-lg text-gray-600 text-center mt-1">Welcome back, CR/ACR</p>
         </div>
 
         <div className="block py-2">

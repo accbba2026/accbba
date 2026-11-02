@@ -9,7 +9,10 @@ export async function GET(request) {
     await connectToDatabase();
     const currentUser = await getCurrentUser();
 
-    if (!currentUser || (currentUser.role !== "faculty" && currentUser.role !== "admin")) {
+    if (
+      !currentUser ||
+      (currentUser.role !== "faculty" && currentUser.role !== "admin")
+    ) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 403 }
@@ -18,6 +21,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const semester = searchParams.get("semester");
+    const major = searchParams.get("major"); // ✅ optional
 
     if (!semester) {
       return NextResponse.json(
@@ -26,18 +30,25 @@ export async function GET(request) {
       );
     }
 
-    // Fetch students for the specific semester
-    const students = await User.find({
-      semester: semester,
+    const query = {
+      semester,
       role: { $in: ["student", "cr"] },
       status: "active",
-      collegeId: { $exists: true, $ne: null, $ne: "" },
-    })
-      .select("name collegeId email phone semester role _id")
+      collegeId: { $exists: true, $nin: [null, ""] },
+    };
+
+    // ✅ Only filter by major when explicitly provided.
+    // If omitted, return students of ALL majors in this semester.
+    if (major) {
+      query.major = major;
+    }
+
+    const students = await User.find(query)
+      .select(
+        "name collegeId email phone semester role major bloodGroup session comments _id"
+      )
       .sort({ collegeId: 1 });
 
-    console.log(`Found ${students.length} students for semester ${semester}`);
-    
     return NextResponse.json({
       success: true,
       data: students,

@@ -1,35 +1,41 @@
 // app/api/cr/get-students/route.js
-import { connectToDatabase } from '@/app/lib/mongodb';
-import User from '@/app/models/User';
-import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/app/lib/authUtils';
+import { connectToDatabase } from "@/app/lib/mongodb";
+import User from "@/app/models/User";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/app/lib/authUtils";
 
 export async function GET(request) {
   try {
     await connectToDatabase();
-
     const currentUser = await getCurrentUser();
 
-    if (!currentUser || currentUser.role !== 'cr') {
+    if (!currentUser || currentUser.role !== "cr") {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: "Unauthorized" },
         { status: 403 }
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const semester = searchParams.get('semester');
+    const semester = searchParams.get("semester") || currentUser.semester;
+    const majorQuery = searchParams.get("major"); // optional override
 
-    // Fetch students AND include the CR themselves
     const query = {
-      collegeId: { $exists: true, $nin: [null, ''] },
-      semester: semester || currentUser.semester,
-      role: { $in: ['student', 'cr'] },
+      collegeId: { $exists: true, $nin: [null, ""] },
+      semester,
+      role: { $in: ["student", "cr"] },
     };
 
+    // ✅ Apply major filter only if explicitly requested.
+    // If omitted, return students of ALL majors in this semester.
+    if (majorQuery) {
+      query.major = majorQuery;
+    }
+
     const students = await User.find(query)
-      // ✅ Added bloodGroup
-      .select('name collegeId phone email semester role bloodGroup session')
+      .select(
+        "name collegeId phone email major semester role bloodGroup comments session"
+      )
       .sort({ collegeId: 1 });
 
     const studentsWithFlag = students.map((student) => ({
@@ -43,9 +49,9 @@ export async function GET(request) {
       count: studentsWithFlag.length,
     });
   } catch (error) {
-    console.error('Error fetching students for CR:', error);
+    console.error("Error fetching students for CR:", error);
     return NextResponse.json(
-      { success: false, message: 'Internal server error' },
+      { success: false, message: "Internal server error" },
       { status: 500 }
     );
   }

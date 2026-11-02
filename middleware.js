@@ -29,6 +29,8 @@ const apiPermissions = {
     "/api/faculty/courses/update",
     "/api/faculty/courses/delete",
     "/api/user/delete-student",
+    "/api/user/add-comment",
+    "/api/user/delete-comment",
   ],
 
   // Admin + Faculty + CR APIs
@@ -37,6 +39,8 @@ const apiPermissions = {
     "/api/user/get-class-students",
     "/api/cr/attendance",
     "/api/user/create-student",
+    "/api/user/blood/delete-history",
+    "/api/user/search",
   ],
 
   // Public APIs (no authentication needed)
@@ -60,6 +64,8 @@ const apiPermissions = {
     "/api/student/assignment-submitted",
     "/api/student/attendance",
     "/api/auth/logout",
+    "/api/user/blood",
+    "/api/user/blood/update-history",
   ],
 };
 

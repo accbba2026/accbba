@@ -10,17 +10,17 @@ const JWT_SECRET = 'bba-is-awesome';
 export async function GET() {
   try {
     await connectToDatabase();
-    
+
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
-    
+
     if (!token) {
       return NextResponse.json(
         { success: false, message: 'Not authenticated' },
         { status: 401 }
       );
     }
-    
+
     let decoded;
     try {
       decoded = jwt.verify(token, JWT_SECRET);
@@ -30,19 +30,18 @@ export async function GET() {
         { status: 401 }
       );
     }
-    
+
     const userId = decoded.id;
-    
-    const user = await User.findById(userId)
-      .select('-password -__v');
-    
+
+    const user = await User.findById(userId).select('-password -__v');
+
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
         { status: 404 }
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       data: {
@@ -57,11 +56,12 @@ export async function GET() {
         semester: user.semester,
         designation: user.designation,
         session: user.session,
+        bloodGroup: user.bloodGroup || null, // ✅ add
+        major: user.major || null,            // ✅ add
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
-      }
+        updatedAt: user.updatedAt,
+      },
     });
-    
   } catch (error) {
     console.error('Error fetching profile:', error);
     return NextResponse.json(

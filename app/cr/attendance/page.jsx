@@ -14,9 +14,19 @@ import {
   FiUserPlus,
   FiPrinter,
   FiSearch,
+  FiBriefcase,
+  FiInfo,
 } from "react-icons/fi";
 import { FaUserCheck } from "react-icons/fa";
 import { TiTick } from "react-icons/ti";
+
+const SENIOR_SEMESTERS = ["7th", "8th"];
+const MAJOR_OPTIONS = [
+  "finance & banking",
+  "marketing",
+  "management",
+  "accounting",
+];
 
 const CRAttendancePage = () => {
   const { user } = useAuth();
@@ -30,7 +40,9 @@ const CRAttendancePage = () => {
   // Date range state
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [dateRangeMode, setDateRangeMode] = useState(false);
+
+  // ✅ NEW — Major filter (7th/8th only)
+  const [majorFilter, setMajorFilter] = useState("finance & banking");
 
   // Add attendance modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -41,26 +53,32 @@ const CRAttendancePage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [totalDates, setTotalDates] = useState(0);
 
-  const userSemester = user?.semester || "1st";
+  // Senior-only state
+  const [classSessions, setClassSessions] = useState([]);
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [sessionDate, setSessionDate] = useState("");
+  const [sessionMajor, setSessionMajor] = useState("");
+  const [sessionNote, setSessionNote] = useState("");
+  const [sessionSubmitting, setSessionSubmitting] = useState(false);
 
-  // Convert YYYY-MM-DD to DD-MM-YYYY for display
+  const userSemester = user?.semester || "1st";
+  const isSenior = SENIOR_SEMESTERS.includes(userSemester);
+
+  // ---- helpers ----
   const formatToDDMMYYYY = (dateStr) => {
     if (!dateStr) return "";
     const parts = dateStr.split("-");
-    if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
     return dateStr;
   };
 
-  // Format date for display in table headers (short)
   const formatTableDateShort = (dateStr) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
     return `${d.getDate()}/${d.getMonth() + 1}`;
   };
 
-  // Get today's date in YYYY-MM-DD for storage
   const getTodayDateForStorage = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -69,31 +87,33 @@ const CRAttendancePage = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // Get default date range (last 30 days)
   const getDefaultDateRange = () => {
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - 30);
-
     const formatDate = (date) => {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
-
     return { start: formatDate(start), end: formatDate(end) };
   };
 
-  // Fetch attendance with date range
-  const fetchAttendanceWithRange = async (semester, start, end) => {
+  // ---- fetch attendance ----
+  const fetchAttendanceWithRange = async (semester, start, end, major = "") => {
     if (!semester) return;
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/cr/attendance?semester=${semester}&startDate=${start}&endDate=${end}`,
-      );
+      const params = new URLSearchParams({
+        semester,
+        startDate: start,
+        endDate: end,
+      });
+      if (major) params.set("major", major);
+
+      const response = await fetch(`/api/cr/attendance?${params.toString()}`);
       const data = await response.json();
 
       if (data.success) {
@@ -103,6 +123,17 @@ const CRAttendancePage = () => {
         );
         setAttendanceDates(sortedDates);
         setTotalDates(data.totalDates);
+
+        if (data.mode === "session") {
+          setClassSessions(data.sessions || []);
+        } else {
+          setClassSessions([]);
+        }
+      } else {
+        setMessage({
+          type: "error",
+          text: data.message || "Failed to load attendance data",
+        });
       }
     } catch (error) {
       console.error("Error fetching attendance:", error);
@@ -112,33 +143,47 @@ const CRAttendancePage = () => {
     }
   };
 
-  // Handle date range change
   const handleDateRangeChange = () => {
     if (startDate && endDate) {
-      fetchAttendanceWithRange(userSemester, startDate, endDate);
-      setDateRangeMode(true);
+      fetchAttendanceWithRange(userSemester, startDate, endDate, majorFilter);
     }
   };
 
-  // Reset to default (last 30 days)
   const handleResetToDefault = () => {
     const { start, end } = getDefaultDateRange();
     setStartDate(start);
     setEndDate(end);
-    setDateRangeMode(false);
-    fetchAttendanceWithRange(userSemester, start, end);
+    fetchAttendanceWithRange(userSemester, start, end, majorFilter);
   };
 
-  // Fetch students for the semester
-  const fetchStudents = async () => {
+  // ✅ NEW — major filter change handler
+  const handleMajorFilterChange = (newMajor) => {
+    setMajorFilter(newMajor);
+    if (startDate && endDate) {
+      fetchAttendanceWithRange(userSemester, startDate, endDate, newMajor);
+    }
+    // Reload the student roster for that major too
+    fetchStudents(newMajor);
+  };
+
+  // ---- fetch students ----
+  // ✅ majorOverride — if provided, fetch students of that specific major
+  const fetchStudents = async (majorOverride) => {
     setLoadingStudents(true);
     try {
-      const response = await fetch(
-        `/api/cr/get-students?semester=${userSemester}`,
-      );
+      const params = new URLSearchParams({ semester: userSemester });
+      const m = majorOverride !== undefined ? majorOverride : majorFilter;
+      if (m) params.set("major", m);
+
+      const response = await fetch(`/api/cr/get-students?${params.toString()}`);
       const data = await response.json();
       if (data.success) {
         setStudents(data.data);
+      } else {
+        setMessage({
+          type: "error",
+          text: data.message || "Failed to load students",
+        });
       }
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -148,47 +193,62 @@ const CRAttendancePage = () => {
     }
   };
 
-  // Initial data load
   useEffect(() => {
     if (user) {
       const { start, end } = getDefaultDateRange();
       //eslint-disable-next-line
       setStartDate(start);
       setEndDate(end);
-      fetchStudents();
-      fetchAttendanceWithRange(userSemester, start, end);
+
+      // ✅ For 7th/8th default to "finance & banking", for others use ""
+      const isSeniorUser = ["7th", "8th"].includes(userSemester);
+      const initialMajor = isSeniorUser ? "finance & banking" : "";
+
+      setMajorFilter(initialMajor);
+      fetchStudents(initialMajor);
+      fetchAttendanceWithRange(userSemester, start, end, initialMajor);
     }
+    //eslint-disable-next-line
   }, [user]);
 
-  // Calculate attendance percentage for a student
+  // ---- attendance math ----
   const getAttendancePercentage = (studentId) => {
-    if (attendanceDates.length === 0) return 0;
+    const total = isSenior ? classSessions.length : attendanceDates.length;
+    if (total === 0) return 0;
 
     let presentCount = 0;
-    attendanceDates.forEach((date) => {
-      if (hasAttendance(date, studentId)) {
-        presentCount++;
-      }
-    });
+    if (isSenior) {
+      classSessions.forEach((s) => {
+        if (hasAttendance(s.date, studentId)) presentCount++;
+      });
+    } else {
+      attendanceDates.forEach((date) => {
+        if (hasAttendance(date, studentId)) presentCount++;
+      });
+    }
 
-    return ((presentCount / attendanceDates.length) * 100).toFixed(1);
+    return ((presentCount / total) * 100).toFixed(1);
   };
 
-  // Get present count for a student
   const getPresentCount = (studentId) => {
     let presentCount = 0;
-    attendanceDates.forEach((date) => {
-      if (hasAttendance(date, studentId)) {
-        presentCount++;
-      }
-    });
+    if (isSenior) {
+      classSessions.forEach((s) => {
+        if (hasAttendance(s.date, studentId)) presentCount++;
+      });
+    } else {
+      attendanceDates.forEach((date) => {
+        if (hasAttendance(date, studentId)) presentCount++;
+      });
+    }
     return presentCount;
   };
 
-  // Search students by college ID or name
+  const totalColumns = isSenior ? classSessions.length : attendanceDates.length;
+
+  // ---- student picker ----
   const handleStudentSearch = (value) => {
     setStudentInput(value);
-
     if (value.length > 1) {
       const filtered = students.filter(
         (s) =>
@@ -202,7 +262,6 @@ const CRAttendancePage = () => {
     }
   };
 
-  // Add student to selection
   const addStudent = (student) => {
     if (!selectedStudentIds.includes(student._id)) {
       setSelectedStudentIds([...selectedStudentIds, student._id]);
@@ -211,7 +270,6 @@ const CRAttendancePage = () => {
     setStudentSuggestions([]);
   };
 
-  // Add multiple students by college IDs
   const addMultipleStudents = (collegeIdsString) => {
     const ids = collegeIdsString
       .split(/[,\s\n]+/)
@@ -245,16 +303,22 @@ const CRAttendancePage = () => {
     setStudentSuggestions([]);
   };
 
-  // Remove student from selection
   const removeStudent = (studentId) => {
     setSelectedStudentIds(selectedStudentIds.filter((id) => id !== studentId));
   };
 
-  // Submit attendance
+  // ---- submit attendance ----
   const handleSubmitAttendance = async (e) => {
     e.preventDefault();
 
-    if (!selectedDate) {
+    if (isSenior && !selectedSessionId) {
+      setMessage({
+        type: "error",
+        text: "Please select a class session for this attendance",
+      });
+      return;
+    }
+    if (!isSenior && !selectedDate) {
       setMessage({ type: "error", text: "Please select a date" });
       return;
     }
@@ -266,28 +330,45 @@ const CRAttendancePage = () => {
 
     setSubmitting(true);
     try {
+      const selectedSession = isSenior
+        ? classSessions.find((s) => s._id === selectedSessionId)
+        : null;
+
+      const payload = isSenior
+        ? {
+            sessionId: selectedSessionId,
+            date: selectedSession?.date,
+            semester: userSemester,
+            major: selectedSession?.major,
+            studentIds: selectedStudentIds,
+          }
+        : {
+            date: selectedDate,
+            semester: userSemester,
+            studentIds: selectedStudentIds,
+          };
+
       const response = await fetch("/api/cr/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: selectedDate,
-          semester: userSemester,
-          studentIds: selectedStudentIds,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        setMessage({
-          type: "success",
-          text: data.message,
-        });
+        setMessage({ type: "success", text: data.message });
         setShowAddModal(false);
         setSelectedStudentIds([]);
         setSelectedDate("");
+        setSelectedSessionId("");
         setStudentInput("");
-        await fetchAttendanceWithRange(userSemester, startDate, endDate);
+        await fetchAttendanceWithRange(
+          userSemester,
+          startDate,
+          endDate,
+          majorFilter,
+        );
         setTimeout(() => setMessage({ type: "", text: "" }), 3000);
       } else {
         throw new Error(data.message);
@@ -300,7 +381,7 @@ const CRAttendancePage = () => {
     }
   };
 
-  // Delete attendance record
+  // ---- delete attendance ----
   const handleDeleteAttendance = async (attendanceId, date, studentName) => {
     const displayDate = formatToDDMMYYYY(date);
     if (!confirm(`Remove attendance for ${studentName} on ${displayDate}?`))
@@ -310,12 +391,16 @@ const CRAttendancePage = () => {
       const response = await fetch(`/api/cr/attendance?id=${attendanceId}`, {
         method: "DELETE",
       });
-
       const data = await response.json();
 
       if (data.success) {
         setMessage({ type: "success", text: data.message });
-        await fetchAttendanceWithRange(userSemester, startDate, endDate);
+        await fetchAttendanceWithRange(
+          userSemester,
+          startDate,
+          endDate,
+          majorFilter,
+        );
         setTimeout(() => setMessage({ type: "", text: "" }), 3000);
       } else {
         throw new Error(data.message);
@@ -326,7 +411,93 @@ const CRAttendancePage = () => {
     }
   };
 
-  // Check if a student has attendance on a specific date
+  // ---- create session ----
+  const handleCreateSession = async (e) => {
+    e.preventDefault();
+    if (!sessionDate) {
+      setMessage({ type: "error", text: "Please select a date" });
+      return;
+    }
+    if (!sessionMajor) {
+      setMessage({ type: "error", text: "Please select a major" });
+      return;
+    }
+
+    setSessionSubmitting(true);
+    try {
+      const response = await fetch("/api/cr/class-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: sessionDate,
+          semester: userSemester,
+          major: sessionMajor,
+          status: "held",
+          note: sessionNote.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMessage({ type: "success", text: "Class session created" });
+        setShowSessionModal(false);
+        setSessionDate("");
+        setSessionMajor("");
+        setSessionNote("");
+        await fetchAttendanceWithRange(
+          userSemester,
+          startDate,
+          endDate,
+          majorFilter,
+        );
+        setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: error.message });
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+    } finally {
+      setSessionSubmitting(false);
+    }
+  };
+
+  // ---- delete session ----
+  const handleDeleteSession = async (sessionId, date) => {
+    if (
+      !confirm(
+        `Delete the ENTIRE session for ${formatToDDMMYYYY(
+          date,
+        )}? This removes all attendance recorded for that day.`,
+      )
+    )
+      return;
+
+    try {
+      const response = await fetch(`/api/cr/class-sessions?id=${sessionId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMessage({ type: "success", text: data.message });
+        await fetchAttendanceWithRange(
+          userSemester,
+          startDate,
+          endDate,
+          majorFilter,
+        );
+        setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: error.message });
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+    }
+  };
+
+  // ---- attendance lookups ----
   const hasAttendance = (date, studentId) => {
     const records = attendanceData[date];
     if (!records) return false;
@@ -336,7 +507,6 @@ const CRAttendancePage = () => {
     );
   };
 
-  // Get attendance record for a student on a specific date
   const getAttendanceRecord = (date, studentId) => {
     const records = attendanceData[date];
     if (!records) return null;
@@ -346,7 +516,17 @@ const CRAttendancePage = () => {
     );
   };
 
- // Print attendance report
+  // When a session is selected in the Mark-Attendance modal, load the students
+  // of that session's major so the picker shows the right set.
+  const handleSessionSelect = async (sessionId) => {
+    setSelectedSessionId(sessionId);
+    const sess = classSessions.find((s) => s._id === sessionId);
+    if (sess?.major) {
+      await fetchStudents(sess.major);
+    }
+  };
+
+  // ---- print ----
   const handlePrint = () => {
     const printContent = document.getElementById(
       "attendance-print-area",
@@ -354,6 +534,17 @@ const CRAttendancePage = () => {
 
     const dateRangeText = `${formatToDDMMYYYY(startDate)} to ${formatToDDMMYYYY(endDate)}`;
     const generatedDate = new Date().toLocaleString();
+    const majorLabel = majorFilter
+      ? ` · Major: ${majorFilter
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ")}`
+      : isSenior
+        ? " · All Majors"
+        : "";
+    const sessionModeLabel = isSenior
+      ? `Sessions: ${classSessions.length}${majorLabel}`
+      : `Classes: ${attendanceDates.length}`;
 
     const printHtml = `
     <!DOCTYPE html>
@@ -367,58 +558,27 @@ const CRAttendancePage = () => {
         body { font-family: Arial, Helvetica, sans-serif; background: white; }
         
         @media print {
-          /* Minimize page margins to edge-to-edge */
           @page { size: A4 landscape; margin: 0.15cm; }
           .print-hide { display: none !important; }
-          body { 
-            padding: 0; 
-            margin: 0; 
-            font-size: 5pt !important; /* Global tiny text */
-            line-height: 1.1 !important; 
-          }
-          
-          /* --- Override Tailwind Constraints --- */
+          body { padding: 0; margin: 0; font-size: 5pt !important; line-height: 1.1 !important; }
           .whitespace-nowrap { white-space: normal !important; }
           [class*="min-w-"] { min-width: 0 !important; } 
           .overflow-x-auto { overflow: visible !important; }
           
-          /* --- Ultra-Compact Table Layout --- */
-          table { 
-            width: 100% !important; 
-            max-width: 100% !important;
-            font-size: 5pt !important; 
-            table-layout: auto !important;
-            border-collapse: collapse !important;
-          }
-          
-          th, td { 
-            padding: 1px !important; /* Strip all padding to 1px */
-            word-break: break-word !important; 
-            white-space: normal !important;
-            border: 0.5px solid #e5e7eb !important;
-            height: auto !important;
-          }
-
-          /* Strip Tailwind paddings forcefully */
+          table { width: 100% !important; max-width: 100% !important; font-size: 5pt !important; table-layout: auto !important; border-collapse: collapse !important; }
+          th, td { padding: 1px !important; word-break: break-word !important; white-space: normal !important; border: 0.5px solid #e5e7eb !important; height: auto !important; }
           .px-4, .py-4, .px-2, .py-3 { padding: 1px !important; }
-          
-          /* Adjust Headers */
           .print-header { margin-bottom: 5px; text-align: center; }
           .print-header h1 { font-size: 9pt; margin: 0; font-weight: bold; }
           .print-header h2 { font-size: 7pt; margin: 2px 0; }
           .print-header p { font-size: 5pt; margin: 1px 0; }
-          
-          /* Shrink Icons & UI elements drastically */
           svg { width: 7px !important; height: 7px !important; }
           .w-6, .h-6 { width: 9px !important; height: 9px !important; min-width: 9px !important; } 
           .text-\\[10px\\] { font-size: 4pt !important; padding: 0 !important; line-height: 1 !important; } 
           .gap-2 { gap: 1px !important; }
-          
-          /* Remove sticky positioning for print */
           .sticky, .left-0, .left-\\[100px\\] { position: static !important; }
         }
         
-        /* General styling for iframe render before print */
         .print-header { margin-bottom: 10px; text-align: center; }
         .print-header h1 { font-size: 14px; margin: 0; }
         .print-header h2 { font-size: 12px; margin: 2px 0; color: #555; }
@@ -428,8 +588,6 @@ const CRAttendancePage = () => {
         th { background-color: #f5f5f5; font-weight: bold; }
         .text-left { text-align: left; }
         .print-footer { margin-top: 5px; font-size: 6px; text-align: center; color: #888; }
-        
-        /* Apply wrap fallback outside of @media print as well */
         .overflow-x-auto { overflow: visible !important; }
         .whitespace-nowrap { white-space: normal !important; }
         [class*="min-w-"] { min-width: 0 !important; } 
@@ -440,6 +598,7 @@ const CRAttendancePage = () => {
         <h1>ATTENDANCE REPORT</h1>
         <h2>${userSemester} Semester</h2>
         <p>Period: ${dateRangeText}</p>
+        <p>${sessionModeLabel}</p>
         <p>Generated on: ${generatedDate}</p>
       </div>
       ${printContent}
@@ -495,7 +654,7 @@ const CRAttendancePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100 py-8 px-2 md:px-6 font-sans text-gray-800">
       <div className="container mx-auto max-w-7xl">
-        {/* Header Section */}
+        {/* Header */}
         <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-6 md:p-8 mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="flex items-center gap-5">
@@ -508,6 +667,12 @@ const CRAttendancePage = () => {
                 </h1>
                 <p className="text-gray-500 font-medium mt-1">
                   {userSemester} Semester Tracking Panel
+                  {isSenior && user?.major && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                      <FiBriefcase size={11} className="capitalize" />
+                      {user.major}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -515,16 +680,33 @@ const CRAttendancePage = () => {
             <div className="flex flex-wrap gap-3 w-full md:w-auto">
               <button
                 onClick={handlePrint}
-                disabled={attendanceDates.length === 0}
+                disabled={totalColumns === 0}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FiPrinter className="text-lg" />{" "}
                 <span className="hidden sm:inline">Print Report</span>
               </button>
+
+              {isSenior && (
+                <button
+                  onClick={() => {
+                    setSessionDate(getTodayDateForStorage());
+                    setSessionMajor(majorFilter || user?.major || "");
+                    setSessionNote("");
+                    setShowSessionModal(true);
+                  }}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white border border-indigo-200 text-indigo-700 font-semibold rounded-xl hover:bg-indigo-50 hover:shadow-sm transition-all"
+                >
+                  <FiCalendar className="text-lg" />
+                  New Class Session
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   setSelectedDate(getTodayDateForStorage());
                   setSelectedStudentIds([]);
+                  setSelectedSessionId("");
                   setStudentInput("");
                   setShowAddModal(true);
                 }}
@@ -536,7 +718,7 @@ const CRAttendancePage = () => {
           </div>
         </div>
 
-        {/* Message Display */}
+        {/* message */}
         {message.text && (
           <div
             className={`mb-6 p-4 rounded-xl flex items-center gap-3 animate-fade-in-down shadow-sm ${
@@ -554,16 +736,44 @@ const CRAttendancePage = () => {
           </div>
         )}
 
-        {/* Filters and Controls */}
+        {/* filters */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-6 mb-8 flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-center">
           <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span className="text-sm font-semibold text-gray-700">
               Showing: {userSemester} Semester
+              {isSenior && majorFilter
+                ? ` · ${majorFilter}`
+                : isSenior
+                  ? " · All Majors"
+                  : ""}
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-end w-full xl:w-auto">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-end w-full xl:w-auto flex-wrap">
+            {/* ✅ NEW — Major filter (senior only) */}
+            {isSenior && (
+              <div className="w-full sm:w-auto">
+                <label className="block text-gray-500 mb-1.5 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+                  <FiBriefcase size={11} /> Major
+                </label>
+                <select
+                  value={majorFilter}
+                  onChange={(e) => handleMajorFilterChange(e.target.value)}
+                  className="w-full sm:w-48 text-gray-700 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm font-medium capitalize"
+                >
+                  {MAJOR_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m
+                        .split(" ")
+                        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                        .join(" ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="w-full sm:w-auto">
               <label className="block text-gray-500 mb-1.5 text-xs font-semibold uppercase tracking-wider">
                 Start Date
@@ -586,7 +796,6 @@ const CRAttendancePage = () => {
                 className="w-full sm:w-40 text-gray-700 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm font-medium"
               />
             </div>
-
             <div className="flex gap-2 w-full sm:w-auto mt-4 sm:mt-0">
               <button
                 onClick={handleDateRangeChange}
@@ -602,7 +811,12 @@ const CRAttendancePage = () => {
               </button>
               <button
                 onClick={() =>
-                  fetchAttendanceWithRange(userSemester, startDate, endDate)
+                  fetchAttendanceWithRange(
+                    userSemester,
+                    startDate,
+                    endDate,
+                    majorFilter,
+                  )
                 }
                 className="px-4 py-2.5 bg-blue-50 text-blue-600 font-medium rounded-xl hover:bg-blue-100 border border-blue-100 transition-all text-sm flex items-center justify-center shrink-0"
                 title="Refresh Data"
@@ -616,9 +830,8 @@ const CRAttendancePage = () => {
           </div>
         </div>
 
-        {/* Summary Details Text */}
         {startDate && endDate && (
-          <div className="mb-4 text-sm font-medium text-gray-500 flex items-center gap-2">
+          <div className="mb-4 text-sm font-medium text-gray-500 flex items-center gap-2 flex-wrap">
             <FiCalendar className="text-gray-400" />
             Report timeframe:{" "}
             <span className="text-gray-800">
@@ -627,12 +840,14 @@ const CRAttendancePage = () => {
             to{" "}
             <span className="text-gray-800">{formatToDDMMYYYY(endDate)}</span>
             <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs ml-2">
-              {attendanceDates.length} Days tracked
+              {isSenior
+                ? `${classSessions.length} sessions tracked`
+                : `${attendanceDates.length} days tracked`}
             </span>
           </div>
         )}
 
-        {/* Attendance Table Card */}
+        {/* Attendance table */}
         <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 overflow-hidden mb-8">
           <div id="attendance-print-area">
             {loadingStudents ? (
@@ -649,6 +864,7 @@ const CRAttendancePage = () => {
                 </div>
                 <p className="text-gray-500 font-medium text-lg">
                   No students found for {userSemester} semester
+                  {isSenior && majorFilter ? ` (${majorFilter})` : ""}
                 </p>
               </div>
             ) : (
@@ -662,21 +878,63 @@ const CRAttendancePage = () => {
                       <th className="left-[100px] z-20 px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider bg-slate-50 shadow-[1px_0_0_#e5e7eb] min-w-[180px]">
                         Student Name
                       </th>
-                      {attendanceDates.map((date) => (
-                        <th
-                          key={date}
-                          className="px-2 py-3 text-center min-w-[65px] border-l border-gray-200/50"
-                        >
-                          <div className="text-gray-800 font-bold">
-                            {formatTableDateShort(date)}
-                          </div>
-                          <div className="text-[10px] font-semibold uppercase text-emerald-600 mt-0.5 bg-emerald-50 rounded px-1 inline-block">
-                            {new Date(date)
-                              .toLocaleDateString("en-GB", { weekday: "short" })
-                              .slice(0, 3)}
-                          </div>
-                        </th>
-                      ))}
+
+                      {isSenior
+                        ? classSessions.map((session) => (
+                            <th
+                              key={session._id}
+                              className="px-2 py-3 text-center min-w-[80px] border-l border-gray-200/50"
+                            >
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="text-gray-800 font-bold">
+                                  {formatTableDateShort(session.date)}
+                                </div>
+                                <div className="text-[10px] font-semibold uppercase text-indigo-600 bg-indigo-50 rounded px-1 inline-block capitalize">
+                                  {session.major
+                                    ? session.major.split(" ")[0]
+                                    : "—"}
+                                </div>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteSession(
+                                      session._id,
+                                      session.date,
+                                    )
+                                  }
+                                  className="text-red-400 hover:text-red-600 print-hide mt-0.5"
+                                  title="Delete entire session"
+                                >
+                                  <FiTrash2 size={12} />
+                                </button>
+                                {session.note && (
+                                  <span
+                                    className="text-[9px] text-amber-600 italic"
+                                    title={session.note}
+                                  >
+                                    note
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                          ))
+                        : attendanceDates.map((date) => (
+                            <th
+                              key={date}
+                              className="px-2 py-3 text-center min-w-[65px] border-l border-gray-200/50"
+                            >
+                              <div className="text-gray-800 font-bold">
+                                {formatTableDateShort(date)}
+                              </div>
+                              <div className="text-[10px] font-semibold uppercase text-emerald-600 mt-0.5 bg-emerald-50 rounded px-1 inline-block">
+                                {new Date(date)
+                                  .toLocaleDateString("en-GB", {
+                                    weekday: "short",
+                                  })
+                                  .slice(0, 3)}
+                              </div>
+                            </th>
+                          ))}
+
                       <th className="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider border-l border-gray-200 shadow-[-1px_0_0_#e5e7eb] bg-slate-50 min-w-[80px]">
                         P / T
                       </th>
@@ -686,7 +944,7 @@ const CRAttendancePage = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {students.map((student, index) => {
+                    {students.map((student) => {
                       const presentCount = getPresentCount(student._id);
                       const percentage = parseFloat(
                         getAttendancePercentage(student._id),
@@ -703,12 +961,20 @@ const CRAttendancePage = () => {
                           }`}
                         >
                           <td
-                            className={`left-0 z-10 px-4 py-3 font-mono text-xs text-gray-600 shadow-[1px_0_0_#e5e7eb] transition-colors ${isCR ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]" : "bg-white group-hover:bg-slate-50"}`}
+                            className={`left-0 z-10 px-4 py-3 font-mono text-xs text-gray-600 shadow-[1px_0_0_#e5e7eb] transition-colors ${
+                              isCR
+                                ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]"
+                                : "bg-white group-hover:bg-slate-50"
+                            }`}
                           >
                             {student.collegeId}
                           </td>
                           <td
-                            className={`left-[100px] z-10 px-4 py-3 shadow-[1px_0_0_#e5e7eb] transition-colors ${isCR ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]" : "bg-white group-hover:bg-slate-50"}`}
+                            className={`left-[100px] z-10 px-4 py-3 shadow-[1px_0_0_#e5e7eb] transition-colors ${
+                              isCR
+                                ? "bg-[#f8fbff] group-hover:bg-[#f0f6ff]"
+                                : "bg-white group-hover:bg-slate-50"
+                            }`}
                           >
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-gray-800 truncate max-w-[130px]">
@@ -719,56 +985,117 @@ const CRAttendancePage = () => {
                                   CR
                                 </span>
                               )}
+                              {isSenior && student.major && (
+                                <span className="text-[9px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded capitalize">
+                                  {student.major.split(" ")[0]}
+                                </span>
+                              )}
                             </div>
                           </td>
 
-                          {attendanceDates.map((date) => {
-                            const hasRecord = hasAttendance(date, student._id);
-                            const record = getAttendanceRecord(
-                              date,
-                              student._id,
-                            );
-                            return (
-                              <td
-                                key={date}
-                                className={`px-2 py-3 text-center border-l border-gray-100/50 transition-colors ${
-                                  hasRecord ? "bg-green-50/30" : ""
-                                }`}
-                              >
-                                {hasRecord ? (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
-                                      <TiTick className="text-lg" />
-                                    </div>
-                                    <button
-                                      onClick={() =>
-                                        handleDeleteAttendance(
-                                          record?._id,
-                                          date,
-                                          student.name,
-                                        )
-                                      }
-                                      className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded-md transition-colors print-hide cursor-pointer shadow-sm border border-red-100 flex items-center justify-center"
-                                      title="Remove attendance"
-                                    >
-                                      <FiTrash2 size={14} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-300 font-bold">
-                                    
-                                  </span>
-                                )}
-                              </td>
-                            );
-                          })}
+                          {isSenior
+                            ? classSessions.map((session) => {
+                                const hasRecord = hasAttendance(
+                                  session.date,
+                                  student._id,
+                                );
+                                const record = getAttendanceRecord(
+                                  session.date,
+                                  student._id,
+                                );
+                                // ✅ Only show mark for students whose major
+                                //   matches the session (otherwise em-dash)
+                                const matchesMajor =
+                                  !session.major ||
+                                  session.major === student.major;
+                                return (
+                                  <td
+                                    key={session._id}
+                                    className={`px-2 py-3 text-center border-l border-gray-100/50 transition-colors ${
+                                      hasRecord ? "bg-green-50/30" : ""
+                                    }`}
+                                  >
+                                    {hasRecord ? (
+                                      <div className="flex items-center justify-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+                                          <TiTick className="text-lg" />
+                                        </div>
+                                        <button
+                                          onClick={() =>
+                                            handleDeleteAttendance(
+                                              record?._id,
+                                              session.date,
+                                              student.name,
+                                            )
+                                          }
+                                          className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded-md transition-colors print-hide cursor-pointer shadow-sm border border-red-100 flex items-center justify-center"
+                                          title="Remove this attendance"
+                                        >
+                                          <FiTrash2 size={14} />
+                                        </button>
+                                      </div>
+                                    ) : matchesMajor ? (
+                                      <span className="text-gray-300 font-bold">
+                                        —
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-200 text-[9px]">
+                                        n/a
+                                      </span>
+                                    )}
+                                  </td>
+                                );
+                              })
+                            : attendanceDates.map((date) => {
+                                const hasRecord = hasAttendance(
+                                  date,
+                                  student._id,
+                                );
+                                const record = getAttendanceRecord(
+                                  date,
+                                  student._id,
+                                );
+                                return (
+                                  <td
+                                    key={date}
+                                    className={`px-2 py-3 text-center border-l border-gray-100/50 transition-colors ${
+                                      hasRecord ? "bg-green-50/30" : ""
+                                    }`}
+                                  >
+                                    {hasRecord ? (
+                                      <div className="flex items-center justify-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+                                          <TiTick className="text-lg" />
+                                        </div>
+                                        <button
+                                          onClick={() =>
+                                            handleDeleteAttendance(
+                                              record?._id,
+                                              date,
+                                              student.name,
+                                            )
+                                          }
+                                          className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded-md transition-colors print-hide cursor-pointer shadow-sm border border-red-100 flex items-center justify-center"
+                                          title="Remove attendance"
+                                        >
+                                          <FiTrash2 size={14} />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-300 font-bold">
+                                        —
+                                      </span>
+                                    )}
+                                  </td>
+                                );
+                              })}
 
                           <td className="px-4 py-3 text-center font-bold text-gray-700 bg-slate-50/50 border-l border-gray-100 shadow-[-1px_0_0_#e5e7eb]">
                             <span className="text-emerald-600">
                               {presentCount}
                             </span>
                             <span className="text-gray-400 mx-1">/</span>
-                            <span>{attendanceDates.length}</span>
+                            <span>{totalColumns}</span>
                           </td>
                           <td className="px-4 py-3 text-center bg-slate-50/50">
                             <span
@@ -795,11 +1122,13 @@ const CRAttendancePage = () => {
                       >
                         <div className="flex items-center gap-2">
                           <FiCalendar className="text-emerald-600" />
-                          Total Recorded Classes: {attendanceDates.length}
+                          Total {isSenior
+                            ? "Sessions"
+                            : "Recorded Classes"}: {totalColumns}
                         </div>
                       </td>
                       <td
-                        colSpan={attendanceDates.length + 2}
+                        colSpan={totalColumns + 2}
                         className="px-4 py-4 text-xs text-gray-500 font-medium text-right"
                       >
                         <span className="inline-flex items-center gap-1 mx-2">
@@ -824,8 +1153,8 @@ const CRAttendancePage = () => {
           </div>
         </div>
 
-        {/* Summary Statistics Cards */}
-        {students.length > 0 && attendanceDates.length > 0 && (
+        {/* summary cards */}
+        {students.length > 0 && totalColumns > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center gap-5 hover:shadow-md transition-shadow">
               <div className="bg-blue-50 p-4 rounded-xl">
@@ -840,21 +1169,19 @@ const CRAttendancePage = () => {
                 </p>
               </div>
             </div>
-
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center gap-5 hover:shadow-md transition-shadow">
               <div className="bg-emerald-50 p-4 rounded-xl">
                 <FiCalendar className="text-2xl text-emerald-600" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-500 mb-1">
-                  Classes Recorded
+                  {isSenior ? "Sessions Recorded" : "Classes Recorded"}
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {attendanceDates.length}
+                  {totalColumns}
                 </p>
               </div>
             </div>
-
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center gap-5 hover:shadow-md transition-shadow">
               <div className="bg-purple-50 p-4 rounded-xl">
                 <FaUserCheck className="text-2xl text-purple-600" />
@@ -880,11 +1207,123 @@ const CRAttendancePage = () => {
           </div>
         )}
 
+        {/* Create Session Modal (senior only) */}
+        {showSessionModal && isSenior && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-gray-100">
+              <div className="bg-gray-50/50 flex justify-between items-center px-6 py-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="bg-indigo-100 p-2 rounded-lg">
+                    <FiCalendar className="text-indigo-600 text-xl" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    New Class Session
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setShowSessionModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <FiX size={22} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={handleCreateSession}
+                className="p-6 space-y-5 flex-1"
+              >
+                <div>
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={sessionDate}
+                    onChange={(e) => setSessionDate(e.target.value)}
+                    required
+                    max={getTodayDateForStorage()}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 font-medium"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Defaults to today. Cannot be a future date.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-medium mb-2 flex items-center gap-2">
+                    <FiBriefcase className="text-indigo-500" /> Major *
+                  </label>
+                  <select
+                    value={sessionMajor}
+                    onChange={(e) => setSessionMajor(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-700 font-medium capitalize"
+                  >
+                    <option value="">— Select a major —</option>
+                    {MAJOR_OPTIONS.map((m) => (
+                      <option key={m} value={m}>
+                        {m
+                          .split(" ")
+                          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                          .join(" ")}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    You can create a session for any major in your semester.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Note (optional)
+                  </label>
+                  <textarea
+                    value={sessionNote}
+                    onChange={(e) => setSessionNote(e.target.value)}
+                    rows={3}
+                    maxLength={200}
+                    placeholder='e.g., "Guest lecture", "No students came" etc.'
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSessionModal(false)}
+                    className="w-1/3 px-4 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      sessionSubmitting || !sessionDate || !sessionMajor
+                    }
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-bold rounded-xl hover:from-indigo-600 hover:to-indigo-800 shadow-md shadow-indigo-200 transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                  >
+                    {sessionSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <FiPlus /> Create Session
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Add Attendance Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-100 transform transition-all">
-              {/* Modal Header */}
               <div className="bg-gray-50/50 flex justify-between items-center px-6 py-5 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="bg-emerald-100 p-2 rounded-lg">
@@ -902,28 +1341,75 @@ const CRAttendancePage = () => {
                 </button>
               </div>
 
-              {/* Modal Body */}
               <form
                 onSubmit={handleSubmitAttendance}
                 className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6"
               >
-                {/* Auto Date Notice */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
-                  <FiCalendar className="text-blue-500 text-xl shrink-0 mt-0.5" />
+                {isSenior ? (
                   <div>
-                    <h4 className="font-semibold text-blue-900 text-sm">
-                      Recording for Today
-                    </h4>
-                    <p className="text-blue-700 text-xs mt-1">
-                      Date automatically set to{" "}
-                      <strong>{formatToDDMMYYYY(selectedDate)}</strong>. The
-                      system locks logs to the current date to prevent
-                      backdating.
+                    <label className="block text-gray-800 font-bold mb-2">
+                      Select Class Session *
+                    </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      You can mark attendance for any major in your semester.
                     </p>
+                    {classSessions.length === 0 ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 flex items-start gap-2">
+                        <FiInfo className="text-lg shrink-0 mt-0.5" />
+                        <div>
+                          No class sessions found in this date range. Close this
+                          dialog and click{" "}
+                          <strong>&ldquo;New Class Session&rdquo;</strong>{" "}
+                          first.
+                        </div>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedSessionId}
+                        onChange={(e) => handleSessionSelect(e.target.value)}
+                        required
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-gray-700 font-medium"
+                      >
+                        <option value="">— Select a session —</option>
+                        {classSessions.map((s) => (
+                          <option key={s._id} value={s._id}>
+                            {formatToDDMMYYYY(s.date)} ·{" "}
+                            {s.major
+                              ? s.major
+                                  .split(" ")
+                                  .map(
+                                    (w) =>
+                                      w.charAt(0).toUpperCase() + w.slice(1),
+                                  )
+                                  .join(" ")
+                              : "—"}{" "}
+                            (
+                            {new Date(s.date).toLocaleDateString("en-GB", {
+                              weekday: "short",
+                            })}
+                            ){s.note ? ` — ${s.note}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+                    <FiCalendar className="text-blue-500 text-xl shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-blue-900 text-sm">
+                        Recording for Today
+                      </h4>
+                      <p className="text-blue-700 text-xs mt-1">
+                        Date automatically set to{" "}
+                        <strong>{formatToDDMMYYYY(selectedDate)}</strong>. A
+                        class session will be auto-created for this date.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-                {/* Bulk Add Input */}
+                {/* bulk add */}
                 <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                   <label className="block text-gray-800 font-bold mb-2">
                     Bulk Add by College ID
@@ -966,7 +1452,7 @@ const CRAttendancePage = () => {
                   </div>
                 </div>
 
-                {/* Search Input */}
+                {/* search */}
                 <div>
                   <label className="block text-gray-800 font-bold mb-3">
                     Search Individual Student
@@ -1004,7 +1490,7 @@ const CRAttendancePage = () => {
                   </div>
                 </div>
 
-                {/* Selected Students Area */}
+                {/* selected */}
                 {selectedStudentIds.length > 0 && (
                   <div className="animate-fade-in">
                     <div className="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
@@ -1062,7 +1548,7 @@ const CRAttendancePage = () => {
                   </div>
                 )}
 
-                {/* Modal Footer Actions */}
+                {/* footer */}
                 <div className="flex gap-3 pt-6 border-t border-gray-100 mt-6 sticky bottom-0 bg-white">
                   <button
                     type="button"
@@ -1076,7 +1562,8 @@ const CRAttendancePage = () => {
                     disabled={
                       submitting ||
                       selectedStudentIds.length === 0 ||
-                      !selectedDate
+                      (isSenior ? !selectedSessionId : !selectedDate) ||
+                      (isSenior && classSessions.length === 0)
                     }
                     className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-md shadow-emerald-200 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
@@ -1099,7 +1586,6 @@ const CRAttendancePage = () => {
         )}
       </div>
 
-      {/* Global styles for animations and custom scrollbar */}
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;

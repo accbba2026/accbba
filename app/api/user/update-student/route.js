@@ -1,15 +1,21 @@
 // app/api/user/update-student/route.js
-import { connectToDatabase } from '@/app/lib/mongodb';
-import User from '@/app/models/User';
-import Log from '@/app/models/Log';
-import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/app/lib/authUtils';
-import { generateRandomPassword, hashPassword } from '@/app/lib/passwordUtils';
-import { sendCredentialsEmail } from '@/app/lib/emailService';
+import { connectToDatabase } from "@/app/lib/mongodb";
+import User from "@/app/models/User";
+import Log from "@/app/models/Log";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/app/lib/authUtils";
+import { generateRandomPassword, hashPassword } from "@/app/lib/passwordUtils";
+import { sendCredentialsEmail } from "@/app/lib/emailService";
 
 // ✅ Valid blood groups
-const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-
+const VALID_BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const VALID_MAJORS = [
+  "finance & banking",
+  "marketing",
+  "management",
+  "accounting",
+];
+const SENIOR_SEMESTERS = ["7th", "8th"];
 export async function PUT(request) {
   try {
     await connectToDatabase();
@@ -17,14 +23,17 @@ export async function PUT(request) {
     const currentUser = await getCurrentUser();
 
     // ✅ Only admin and faculty can update students
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'faculty')) {
+    if (
+      !currentUser ||
+      (currentUser.role !== "admin" && currentUser.role !== "faculty")
+    ) {
       await Log.create({
         user: currentUser?._id || null,
-        userRole: currentUser?.role || 'unknown',
-        action: 'USER_UPDATE',
-        resourceType: 'user',
+        userRole: currentUser?.role || "unknown",
+        action: "USER_UPDATE",
+        resourceType: "user",
         details: JSON.stringify({
-          action: 'Unauthorized Student Update Attempt',
+          action: "Unauthorized Student Update Attempt",
           user: currentUser
             ? {
                 id: currentUser._id,
@@ -38,23 +47,37 @@ export async function PUT(request) {
       });
 
       return NextResponse.json(
-        { success: false, message: 'Unauthorized. Admin or Faculty access required.' },
-        { status: 403 }
+        {
+          success: false,
+          message: "Unauthorized. Admin or Faculty access required.",
+        },
+        { status: 403 },
       );
     }
 
     const body = await request.json();
-    // ✅ Added bloodGroup
-    const { id, name, phone, email, semester, session, status, role, password, bloodGroup } = body;
+    const {
+      id,
+      name,
+      phone,
+      email,
+      semester,
+      session,
+      status,
+      role,
+      password,
+      bloodGroup,
+      major,
+    } = body;
 
     if (!id) {
       await Log.create({
         user: currentUser._id,
         userRole: currentUser.role,
-        action: 'USER_UPDATE',
-        resourceType: 'user',
+        action: "USER_UPDATE",
+        resourceType: "user",
         details: JSON.stringify({
-          action: 'Student Update Failed - Missing ID',
+          action: "Student Update Failed - Missing ID",
           user: {
             id: currentUser._id,
             name: currentUser.name,
@@ -66,22 +89,22 @@ export async function PUT(request) {
       });
 
       return NextResponse.json(
-        { success: false, message: 'Student ID is required' },
-        { status: 400 }
+        { success: false, message: "Student ID is required" },
+        { status: 400 },
       );
     }
 
     // Get the current student to check role change and original data
-    const currentStudent = await User.findById(id).select('+password');
+    const currentStudent = await User.findById(id).select("+password");
     if (!currentStudent) {
       await Log.create({
         user: currentUser._id,
         userRole: currentUser.role,
-        action: 'USER_UPDATE',
-        resourceType: 'user',
+        action: "USER_UPDATE",
+        resourceType: "user",
         resourceId: id,
         details: JSON.stringify({
-          action: 'Student Update Failed - Student Not Found',
+          action: "Student Update Failed - Student Not Found",
           user: {
             id: currentUser._id,
             name: currentUser.name,
@@ -94,14 +117,14 @@ export async function PUT(request) {
       });
 
       return NextResponse.json(
-        { success: false, message: 'Student not found' },
-        { status: 404 }
+        { success: false, message: "Student not found" },
+        { status: 404 },
       );
     }
 
-    const wasCR = currentStudent.role === 'cr';
-    const isBecomingCR = role === 'cr' && !wasCR;
-    const isLosingCR = wasCR && role !== 'cr';
+    const wasCR = currentStudent.role === "cr";
+    const isBecomingCR = role === "cr" && !wasCR;
+    const isLosingCR = wasCR && role !== "cr";
 
     // Track changes
     const changes = [];
@@ -110,9 +133,10 @@ export async function PUT(request) {
     // Store original data for comparison
     const originalData = {
       name: currentStudent.name,
-      phone: currentStudent.phone || 'Not set',
-      email: currentStudent.email || 'Not set',
-      bloodGroup: currentStudent.bloodGroup || 'Not set', // ✅
+      phone: currentStudent.phone || "Not set",
+      email: currentStudent.email || "Not set",
+      bloodGroup: currentStudent.bloodGroup || "Not set",
+      major: currentStudent.major || "Not set",
       semester: currentStudent.semester,
       session: currentStudent.session,
       status: currentStudent.status,
@@ -123,32 +147,56 @@ export async function PUT(request) {
     if (phone && phone.trim()) {
       const phonePattern = /^01[3-9]\d{8}$/;
       if (!phonePattern.test(phone)) {
-        validationErrors.push('Phone number must be a valid Bangladeshi number');
+        validationErrors.push(
+          "Phone number must be a valid Bangladeshi number",
+        );
       }
     }
 
     // ✅ Validate blood group (optional)
-    if (bloodGroup !== undefined && bloodGroup !== null && bloodGroup !== '' && !VALID_BLOOD_GROUPS.includes(bloodGroup)) {
+    if (
+      bloodGroup !== undefined &&
+      bloodGroup !== null &&
+      bloodGroup !== "" &&
+      !VALID_BLOOD_GROUPS.includes(bloodGroup)
+    ) {
       validationErrors.push(
-        `Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`
+        `Blood group must be one of: ${VALID_BLOOD_GROUPS.join(", ")}`,
       );
     }
 
+    // ✅ Validate major — only for 7th/8th semester
+    // Determine the resulting semester (new semester if changing, else current)
+    const resultingSemester = semester || currentStudent.semester;
+    const willBeSenior = SENIOR_SEMESTERS.includes(resultingSemester);
+    const majorProvided = major !== undefined && major !== null && major !== "";
+
+    if (majorProvided && !willBeSenior) {
+      validationErrors.push(
+        `Major can only be set for 7th & 8th semester students (target semester: ${resultingSemester})`,
+      );
+    }
+    if (majorProvided && !VALID_MAJORS.includes(major)) {
+      validationErrors.push(`Major must be one of: ${VALID_MAJORS.join(", ")}`);
+    }
+
     // Email validation - REQUIRED for CR role
-    if (role === 'cr') {
+    if (role === "cr") {
       if (!email || !email.trim()) {
-        validationErrors.push('Email is required for Class Representative (CR) role');
+        validationErrors.push(
+          "Email is required for Class Representative (CR) role",
+        );
       } else {
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailPattern.test(email)) {
-          validationErrors.push('Please enter a valid email address for CR');
+          validationErrors.push("Please enter a valid email address for CR");
         } else {
           const existingEmail = await User.findOne({
             email: email.toLowerCase(),
             _id: { $ne: id },
           });
           if (existingEmail) {
-            validationErrors.push('Email already exists for another student');
+            validationErrors.push("Email already exists for another student");
           }
         }
       }
@@ -156,54 +204,66 @@ export async function PUT(request) {
       if (email && email.trim()) {
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailPattern.test(email)) {
-          validationErrors.push('Please enter a valid email address');
+          validationErrors.push("Please enter a valid email address");
         } else {
           const existingEmail = await User.findOne({
             email: email.toLowerCase(),
             _id: { $ne: id },
           });
           if (existingEmail) {
-            validationErrors.push('Email already exists for another student');
+            validationErrors.push("Email already exists for another student");
           }
         }
       }
     }
 
     // Validate semester
-    const validSemesters = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', 'graduated'];
+    const validSemesters = [
+      "1st",
+      "2nd",
+      "3rd",
+      "4th",
+      "5th",
+      "6th",
+      "7th",
+      "8th",
+      "graduated",
+    ];
     if (semester && !validSemesters.includes(semester)) {
-      validationErrors.push('Invalid semester');
+      validationErrors.push("Invalid semester");
     }
 
     // Validate session format
     if (session && session.trim()) {
       const sessionPattern = /^\d{4}-\d{2,4}$/;
       if (!sessionPattern.test(session)) {
-        validationErrors.push('Session must be in format like "2021-22" or "2021-2022"');
+        validationErrors.push(
+          'Session must be in format like "2021-22" or "2021-2022"',
+        );
       }
     }
 
     // Validate status
-    const validStatuses = ['active', 'inactive', 'graduated', 'suspended'];
+    const validStatuses = ["active", "inactive", "graduated", "suspended"];
     if (status && !validStatuses.includes(status)) {
-      validationErrors.push('Invalid status');
+      validationErrors.push("Invalid status");
     }
 
     // Validate role
-    const validRoles = ['student', 'admin', 'faculty', 'cr'];
+    const validRoles = ["student", "admin", "faculty", "cr"];
     if (role && !validRoles.includes(role)) {
-      validationErrors.push('Invalid role');
+      validationErrors.push("Invalid role");
     }
 
     if (validationErrors.length > 0) {
       await Log.create({
         user: currentUser._id,
         userRole: currentUser.role,
-        action: 'USER_UPDATE',
-        resourceType: 'user',
+        action: "USER_UPDATE",
+        resourceType: "user",
         resourceId: id,
         details: JSON.stringify({
-          action: 'Student Update Failed - Validation Error',
+          action: "Student Update Failed - Validation Error",
           user: {
             id: currentUser._id,
             name: currentUser.name,
@@ -212,14 +272,15 @@ export async function PUT(request) {
           },
           validationErrors,
           attemptedData: {
-            name: name || 'Not changing',
-            phone: phone || 'Not changing',
-            email: email || 'Not changing',
-            bloodGroup: bloodGroup !== undefined ? bloodGroup : 'Not changing', // ✅
-            semester: semester || 'Not changing',
-            session: session || 'Not changing',
-            status: status || 'Not changing',
-            role: role || 'Not changing',
+            name: name || "Not changing",
+            phone: phone || "Not changing",
+            email: email || "Not changing",
+            bloodGroup: bloodGroup !== undefined ? bloodGroup : "Not changing", // ✅
+            major: major !== undefined ? major : 'Not changing',
+            semester: semester || "Not changing",
+            session: session || "Not changing",
+            status: status || "Not changing",
+            role: role || "Not changing",
           },
           timestamp: new Date().toISOString(),
         }),
@@ -227,7 +288,7 @@ export async function PUT(request) {
 
       return NextResponse.json(
         { success: false, message: validationErrors[0] },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -241,31 +302,56 @@ export async function PUT(request) {
 
     if (phone !== undefined) {
       const newPhone = phone?.trim() || null;
-      const oldPhone = currentStudent.phone || 'Not set';
+      const oldPhone = currentStudent.phone || "Not set";
       if (newPhone !== currentStudent.phone) {
         updateData.phone = newPhone;
-        changes.push(`Phone: "${oldPhone}" → "${newPhone || 'Removed'}"`);
+        changes.push(`Phone: "${oldPhone}" → "${newPhone || "Removed"}"`);
       }
     }
 
     if (email !== undefined) {
       const newEmail = email?.trim().toLowerCase() || null;
-      const oldEmail = currentStudent.email || 'Not set';
+      const oldEmail = currentStudent.email || "Not set";
       if (newEmail !== currentStudent.email) {
         updateData.email = newEmail;
-        changes.push(`Email: "${oldEmail}" → "${newEmail || 'Removed'}"`);
+        changes.push(`Email: "${oldEmail}" → "${newEmail || "Removed"}"`);
       }
     }
 
     // ✅ Handle blood group update
     if (bloodGroup !== undefined) {
       const newBloodGroup = bloodGroup?.trim() || null;
-      const oldBloodGroup = currentStudent.bloodGroup || 'Not set';
+      const oldBloodGroup = currentStudent.bloodGroup || "Not set";
       if (newBloodGroup !== currentStudent.bloodGroup) {
         updateData.bloodGroup = newBloodGroup || undefined; // unset if empty
-        changes.push(`Blood Group: "${oldBloodGroup}" → "${newBloodGroup || 'Removed'}"`);
+        changes.push(
+          `Blood Group: "${oldBloodGroup}" → "${newBloodGroup || "Removed"}"`,
+        );
       }
     }
+
+    // ✅ Handle major update (only meaningful for 7th/8th)
+if (major !== undefined && willBeSenior) {
+  const newMajor = major?.trim() || null;
+  const oldMajor = currentStudent.major || null;
+  if (newMajor !== oldMajor) {
+    if (newMajor) {
+      updateData.major = newMajor;
+    } else {
+      // Explicitly unset
+      updateData.major = null;
+    }
+    changes.push(
+      `Major: "${oldMajor || 'Not set'}" → "${newMajor || 'Removed'}"`
+    );
+  }
+} else if (!willBeSenior && currentStudent.major) {
+  // Student is moving OUT of 7th/8th → clear major automatically
+  updateData.major = null;
+  changes.push(
+    `Major: "${currentStudent.major}" → "Removed" (no longer 7th/8th semester)`
+  );
+}
 
     if (semester && semester !== currentStudent.semester) {
       updateData.semester = semester;
@@ -286,10 +372,12 @@ export async function PUT(request) {
       updateData.role = role;
       changes.push(`Role: "${currentStudent.role}" → "${role}"`);
       if (isBecomingCR) {
-        changes.push('Promoted to Class Representative (CR) - Login credentials will be sent');
+        changes.push(
+          "Promoted to Class Representative (CR) - Login credentials will be sent",
+        );
       }
       if (isLosingCR) {
-        changes.push('Removed from Class Representative (CR) role');
+        changes.push("Removed from Class Representative (CR) role");
       }
     }
 
@@ -316,11 +404,11 @@ export async function PUT(request) {
     await Log.create({
       user: currentUser._id,
       userRole: currentUser.role,
-      action: 'USER_UPDATE',
-      resourceType: 'user',
+      action: "USER_UPDATE",
+      resourceType: "user",
       resourceId: id,
       details: JSON.stringify({
-        action: 'Student Update Attempt',
+        action: "Student Update Attempt",
         user: {
           id: currentUser._id,
           name: currentUser.name,
@@ -330,14 +418,19 @@ export async function PUT(request) {
         },
         originalStudent: originalData,
         updateData: {
-          name: name || 'Not changing',
-          phone: phone !== undefined ? phone || 'Will be removed' : 'Not changing',
-          email: email !== undefined ? email || 'Will be removed' : 'Not changing',
-          bloodGroup: bloodGroup !== undefined ? bloodGroup || 'Will be removed' : 'Not changing', // ✅
-          semester: semester || 'Not changing',
-          session: session || 'Not changing',
-          status: status || 'Not changing',
-          role: role || 'Not changing',
+          name: name || "Not changing",
+          phone:
+            phone !== undefined ? phone || "Will be removed" : "Not changing",
+          email:
+            email !== undefined ? email || "Will be removed" : "Not changing",
+          bloodGroup:
+            bloodGroup !== undefined
+              ? bloodGroup || "Will be removed"
+              : "Not changing", // ✅
+          semester: semester || "Not changing",
+          session: session || "Not changing",
+          status: status || "Not changing",
+          role: role || "Not changing",
         },
         changes,
         timestamp: new Date().toISOString(),
@@ -354,11 +447,11 @@ export async function PUT(request) {
       await Log.create({
         user: currentUser._id,
         userRole: currentUser.role,
-        action: 'USER_UPDATE',
-        resourceType: 'user',
+        action: "USER_UPDATE",
+        resourceType: "user",
         resourceId: id,
         details: JSON.stringify({
-          action: 'Student Update Failed - Update Error',
+          action: "Student Update Failed - Update Error",
           user: {
             id: currentUser._id,
             name: currentUser.name,
@@ -371,8 +464,8 @@ export async function PUT(request) {
       });
 
       return NextResponse.json(
-        { success: false, message: 'Student not found' },
-        { status: 404 }
+        { success: false, message: "Student not found" },
+        { status: 404 },
       );
     }
 
@@ -386,15 +479,15 @@ export async function PUT(request) {
           updatedStudent.email,
           updatedStudent.name,
           generatedPassword,
-          updatedStudent.collegeId
+          updatedStudent.collegeId,
         );
         if (!emailSent) {
-          emailError = 'Email sending failed';
-          console.warn('Email sending failed for CR:', updatedStudent.email);
+          emailError = "Email sending failed";
+          console.warn("Email sending failed for CR:", updatedStudent.email);
         }
       } catch (error) {
         emailError = error.message;
-        console.error('Error sending CR credentials email:', error);
+        console.error("Error sending CR credentials email:", error);
       }
     }
 
@@ -402,11 +495,11 @@ export async function PUT(request) {
     await Log.create({
       user: currentUser._id,
       userRole: currentUser.role,
-      action: 'USER_UPDATE',
-      resourceType: 'user',
+      action: "USER_UPDATE",
+      resourceType: "user",
       resourceId: id,
       details: JSON.stringify({
-        action: 'Student Updated Successfully',
+        action: "Student Updated Successfully",
         updatedBy: {
           id: currentUser._id,
           name: currentUser.name,
@@ -418,9 +511,10 @@ export async function PUT(request) {
           id: updatedStudent._id,
           name: updatedStudent.name,
           collegeId: updatedStudent.collegeId,
-          email: updatedStudent.email || 'Not set',
-          phone: updatedStudent.phone || 'Not set',
-          bloodGroup: updatedStudent.bloodGroup || 'Not set', // ✅
+          email: updatedStudent.email || "Not set",
+          phone: updatedStudent.phone || "Not set",
+          bloodGroup: updatedStudent.bloodGroup || "Not set",
+           major: updatedStudent.major || 'Not set', 
           semester: updatedStudent.semester,
           session: updatedStudent.session,
           status: updatedStudent.status,
@@ -431,7 +525,7 @@ export async function PUT(request) {
           changes,
           roleChanged: {
             wasCR,
-            isNowCR: updatedStudent.role === 'cr',
+            isNowCR: updatedStudent.role === "cr",
             credentialsSent: shouldSendEmail && emailSent,
           },
         },
@@ -446,13 +540,13 @@ export async function PUT(request) {
     return NextResponse.json({
       success: true,
       message: shouldSendEmail
-        ? 'Student updated successfully! Credentials have been sent to their email.'
-        : 'Student updated successfully',
+        ? "Student updated successfully! Credentials have been sent to their email."
+        : "Student updated successfully",
       data: updatedStudent,
       passwordSent: shouldSendEmail && emailSent,
     });
   } catch (error) {
-    console.error('Error updating student:', error);
+    console.error("Error updating student:", error);
 
     try {
       const { id } = await request.json().catch(() => ({}));
@@ -460,12 +554,12 @@ export async function PUT(request) {
 
       await Log.create({
         user: currentUser?._id || null,
-        userRole: currentUser?.role || 'unknown',
-        action: 'USER_UPDATE',
-        resourceType: 'user',
+        userRole: currentUser?.role || "unknown",
+        action: "USER_UPDATE",
+        resourceType: "user",
         resourceId: id,
         details: JSON.stringify({
-          action: 'Student Update Failed - System Error',
+          action: "Student Update Failed - System Error",
           user: currentUser
             ? {
                 id: currentUser._id,
@@ -481,7 +575,7 @@ export async function PUT(request) {
                 collegeId: student.collegeId,
                 role: student.role,
               }
-            : { id, name: 'Unknown' },
+            : { id, name: "Unknown" },
           error: {
             name: error.name,
             message: error.message,
@@ -491,12 +585,16 @@ export async function PUT(request) {
         }),
       });
     } catch (logError) {
-      console.error('Failed to create error log:', logError);
+      console.error("Failed to create error log:", logError);
     }
 
     return NextResponse.json(
-      { success: false, message: 'Internal server error', error: error.message },
-      { status: 500 }
+      {
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      },
+      { status: 500 },
     );
   }
 }

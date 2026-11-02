@@ -1,0 +1,328 @@
+// app/api/cr/class-sessions/route.js
+import { connectToDatabase } from "@/app/lib/mongodb";
+import ClassSession from "@/app/models/ClassSession";
+import Attendance from "@/app/models/Attendance";
+import Log from "@/app/models/Log";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/app/lib/authUtils";
+
+const SENIOR_SEMESTERS = ["7th", "8th"];
+const VALID_MAJORS = [
+  "finance & banking",
+  "marketing",
+  "management",
+  "accounting",
+];
+
+// GET — list sessions (filter by semester / major / date range)
+export async function GET(request) {
+  try {
+    await connectToDatabase();
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser || currentUser.role !== "cr") {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const semester = searchParams.get("semester");
+    const major = searchParams.get("major");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+
+    if (!semester) {
+      return NextResponse.json(
+        { success: false, message: "Semester is required" },
+        { status: 400 }
+      );
+    }
+
+    // CR is locked to their own semester
+    if (semester !== currentUser.semester) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "You can only view your semester's sessions",
+        },
+        { status: 403 }
+      );
+    }
+
+    const query = { semester };
+    if (major) query.major = major;
+    if (startDate && endDate) {
+      query.date = { $gte: startDate, $lte: endDate };
+    }
+
+    const sessions = await ClassSession.find(query)
+      .populate("inputBy", "name collegeId")
+      .sort({ date: 1, createdAt: 1 });
+
+    return NextResponse.json({
+      success: true,
+      data: sessions,
+      count: sessions.length,
+    });
+  } catch (error) {
+    console.error("Error fetching class sessions:", error);
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// POST — create a class session
+//   • 7th/8th → CR can pick ANY major (their own, or a different one)
+//   • 1st–6th → not allowed here (handled automatically during POST /attendance)
+export async function POST(request) {
+  try {
+    await connectToDatabase();
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser || currentUser.role !== "cr") {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    const {
+      date,
+      semester,
+      major: bodyMajor,
+      status = "held",
+      note,
+    } = await request.json();
+
+    if (!date || !semester) {
+      return NextResponse.json(
+        { success: false, message: "Date and semester are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!SENIOR_SEMESTERS.includes(semester)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Class sessions are auto-created for 1st–6th semester when attendance is first marked.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (semester !== currentUser.semester) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "You can only create sessions for your semester",
+        },
+        { status: 403 }
+      );
+    }
+
+    // ✅ Major: allow any of the 4 valid values.
+    //   If body omits it → fall back to CR's own assigned major (if any).
+    const major = bodyMajor || currentUser.major || null;
+
+    if (!major) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Major is required. Select a major or ask admin to assign one to your account.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!VALID_MAJORS.includes(major)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Major must be one of: ${VALID_MAJORS.join(", ")}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (status !== "held" && status !== "cancelled") {
+      return NextResponse.json(
+        { success: false, message: "Status must be 'held' or 'cancelled'" },
+        { status: 400 }
+      );
+    }
+
+    // Duplicate check
+    const existing = await ClassSession.findOne({ date, semester, major });
+    if (existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `A session already exists for ${major} on ${date}`,
+          data: existing,
+        },
+        { status: 409 }
+      );
+    }
+
+    const session = await ClassSession.create({
+      date,
+      semester,
+      major,
+      inputBy: currentUser._id,
+      status,
+      note: note?.trim() || undefined,
+      isAutoGenerated: false,
+    });
+
+    await Log.create({
+      user: currentUser._id,
+      userRole: currentUser.role,
+      action: "ATTENDANCE_MARK",
+      resourceType: "attendance",
+      resourceId: session._id,
+      details: JSON.stringify({
+        action: "Class Session Created",
+        session: {
+          id: session._id,
+          date,
+          semester,
+          major,
+          status,
+        },
+        createdBy: {
+          id: currentUser._id,
+          name: currentUser.name,
+          collegeId: currentUser.collegeId,
+          major: currentUser.major || null,
+        },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Class session created",
+      data: session,
+    });
+  } catch (error) {
+    console.error("Error creating class session:", error);
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "A session already exists for this date + major",
+        },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE — delete a session + all its attendance records
+//   • CR can delete sessions in their own semester (any major)
+//   • Auto-generated (1st–6th) sessions cannot be deleted directly — deleting
+//     all attendance for that date effectively removes the reason for the session
+export async function DELETE(request) {
+  try {
+    await connectToDatabase();
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser || currentUser.role !== "cr") {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get("id");
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { success: false, message: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const session = await ClassSession.findById(sessionId);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, message: "Session not found" },
+        { status: 404 }
+      );
+    }
+
+    if (session.semester !== currentUser.semester) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "You can only delete sessions in your semester",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (session.isAutoGenerated) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Auto-generated class sessions cannot be deleted manually. Remove the attendance records instead.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const deletedAttendance = await Attendance.deleteMany({
+      sessionId: session._id,
+    });
+
+    await ClassSession.findByIdAndDelete(sessionId);
+
+    await Log.create({
+      user: currentUser._id,
+      userRole: currentUser.role,
+      action: "ATTENDANCE_DELETE",
+      resourceType: "attendance",
+      resourceId: sessionId,
+      details: JSON.stringify({
+        action: "Class Session Deleted",
+        session: {
+          id: session._id,
+          date: session.date,
+          semester: session.semester,
+          major: session.major,
+        },
+        deletedAttendanceCount: deletedAttendance.deletedCount,
+        deletedBy: {
+          id: currentUser._id,
+          name: currentUser.name,
+          collegeId: currentUser.collegeId,
+        },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Session deleted (${deletedAttendance.deletedCount} attendance records removed)`,
+    });
+  } catch (error) {
+    console.error("Error deleting class session:", error);
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500 }
+    );
+  }
+}

@@ -3,16 +3,27 @@ import { connectToDatabase } from "@/app/lib/mongodb";
 import Attendance from "@/app/models/Attendance";
 import User from "@/app/models/User";
 import Log from "@/app/models/Log";
+import ClassSession from "@/app/models/ClassSession";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/app/lib/authUtils";
 
-// GET attendance records
+const SENIOR_SEMESTERS = ["7th", "8th"];
+
+// ============================================================
+// GET — list attendance
+//   • 1st–6th   → legacy flow
+//   • 7th/8th   → session-based flow
+//   major is OPTIONAL — faculty can view any/all majors
+// ============================================================
 export async function GET(request) {
   try {
     await connectToDatabase();
     const currentUser = await getCurrentUser();
 
-    if (!currentUser || (currentUser.role !== "faculty" && currentUser.role !== "admin")) {
+    if (
+      !currentUser ||
+      (currentUser.role !== "faculty" && currentUser.role !== "admin")
+    ) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 403 }
@@ -31,35 +42,75 @@ export async function GET(request) {
       );
     }
 
+    // ✅ ========== 7th / 8th semester: session-based ==========
+    if (SENIOR_SEMESTERS.includes(semester)) {
+      const majorFilter = searchParams.get("major"); // optional
+
+      const sessionQuery = { semester };
+      if (majorFilter) sessionQuery.major = majorFilter;
+      if (startDate && endDate) {
+        sessionQuery.date = { $gte: startDate, $lte: endDate };
+      }
+
+      const sessions = await ClassSession.find(sessionQuery)
+        .populate("inputBy", "name")
+        .sort({ date: 1 });
+
+      const sessionIds = sessions.map((s) => s._id);
+
+      const records = await Attendance.find({
+        sessionId: { $in: sessionIds },
+      })
+        .populate("studentId", "name collegeId email")
+        .populate("inputBy", "name")
+        .sort({ date: 1, createdAt: 1 });
+
+      const groupedByDate = {};
+      records.forEach((r) => {
+        if (!groupedByDate[r.date]) groupedByDate[r.date] = [];
+        groupedByDate[r.date].push(r);
+      });
+
+      const dates = Object.keys(groupedByDate).sort();
+
+      return NextResponse.json({
+        success: true,
+        mode: "session",
+        major: majorFilter || null,
+        data: groupedByDate,
+        dates,
+        totalDates: dates.length,
+        sessions,
+        totalSessions: sessions.length,
+      });
+    }
+    // ✅ ========== end 7th/8th branch ==========
+
+    // ========== 1st–6th: legacy ==========
     const query = { semester };
-    
     if (startDate && endDate) {
       query.date = { $gte: startDate, $lte: endDate };
     }
 
-    // Get all attendance records for the semester within date range
     const attendance = await Attendance.find(query)
       .populate("studentId", "name collegeId email")
       .populate("inputBy", "name")
       .sort({ date: 1, createdAt: 1 });
 
-    // Group by date
     const groupedByDate = attendance.reduce((acc, record) => {
       const date = record.date;
-      if (!acc[date]) {
-        acc[date] = [];
-      }
+      if (!acc[date]) acc[date] = [];
       acc[date].push(record);
       return acc;
     }, {});
 
-    // Get unique dates sorted
     const dates = Object.keys(groupedByDate).sort();
 
     return NextResponse.json({
       success: true,
+      mode: "legacy",
       data: groupedByDate,
-      dates: dates,
+      dates,
       totalDates: dates.length,
     });
   } catch (error) {
@@ -71,159 +122,266 @@ export async function GET(request) {
   }
 }
 
-// POST - Add attendance for multiple students
+// ============================================================
+// POST — mark attendance
+//   • 1st–6th   → find-or-create implicit session, then insert
+//   • 7th/8th   → requires sessionId (created manually)
+// ============================================================
 export async function POST(request) {
   try {
     await connectToDatabase();
     const currentUser = await getCurrentUser();
 
-    if (!currentUser || (currentUser.role !== "faculty" && currentUser.role !== "admin")) {
-      // Log unauthorized attempt
+    if (
+      !currentUser ||
+      (currentUser.role !== "faculty" && currentUser.role !== "admin")
+    ) {
       await Log.create({
         user: currentUser?._id || null,
-        userRole: currentUser?.role || 'unknown',
+        userRole: currentUser?.role || "unknown",
         action: "ATTENDANCE_MARK",
         resourceType: "attendance",
         details: JSON.stringify({
           action: "Unauthorized Attendance Marking Attempt",
-          user: currentUser ? {
-            id: currentUser._id,
-            name: currentUser.name,
-            collegeId: currentUser.collegeId,
-            role: currentUser.role
-          } : null,
-          timestamp: new Date().toISOString()
-        })
+          user: currentUser
+            ? {
+                id: currentUser._id,
+                name: currentUser.name,
+                collegeId: currentUser.collegeId,
+                role: currentUser.role,
+              }
+            : null,
+          timestamp: new Date().toISOString(),
+        }),
       });
-      
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 403 }
       );
     }
 
-    const { date, semester, studentIds } = await request.json();
+    const body = await request.json();
+    const { date, semester, studentIds, sessionId, major: bodyMajor } = body;
 
     if (!date || !semester || !studentIds || studentIds.length === 0) {
-      const missingFields = [];
-      if (!date) missingFields.push('date');
-      if (!semester) missingFields.push('semester');
-      if (!studentIds || studentIds.length === 0) missingFields.push('studentIds');
-      
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Date, semester, and student IDs are required",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ✅ ========== 7th / 8th semester: session-based ==========
+    if (SENIOR_SEMESTERS.includes(semester)) {
+      if (!sessionId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "sessionId is required for 7th/8th semester. Create a class session first.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const session = await ClassSession.findById(sessionId);
+      if (!session) {
+        return NextResponse.json(
+          { success: false, message: "Class session not found" },
+          { status: 404 }
+        );
+      }
+      if (session.semester !== semester) {
+        return NextResponse.json(
+          { success: false, message: "Session semester mismatch" },
+          { status: 400 }
+        );
+      }
+      if (session.date !== date) {
+        return NextResponse.json(
+          { success: false, message: "Session date mismatch" },
+          { status: 400 }
+        );
+      }
+      if (session.status === "cancelled") {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Cannot mark attendance for a cancelled session",
+          },
+          { status: 400 }
+        );
+      }
+
+      const sessionMajor = session.major;
+      const majorFilter = bodyMajor || sessionMajor;
+      if (majorFilter !== sessionMajor) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `This session is for ${sessionMajor}, not ${majorFilter}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const validStudents = await User.find({
+        _id: { $in: studentIds },
+        semester,
+        major: sessionMajor,
+        role: { $in: ["student", "cr"] },
+      }).select("_id name collegeId email role");
+
+      const validIds = new Set(validStudents.map((s) => s._id.toString()));
+      const invalidIds = studentIds.filter((id) => !validIds.has(id));
+
+      if (invalidIds.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `${invalidIds.length} student(s) do not belong to ${semester} ${sessionMajor}. Attendance not saved.`,
+            invalidIds,
+          },
+          { status: 400 }
+        );
+      }
+
+      const existing = await Attendance.find({
+        sessionId: session._id,
+        studentId: { $in: studentIds },
+      }).select("studentId");
+
+      const alreadyIds = new Set(existing.map((e) => e.studentId.toString()));
+      const newIds = studentIds.filter((id) => !alreadyIds.has(id));
+
+      if (newIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          message: "Attendance already marked for all selected students",
+          addedCount: 0,
+          alreadyExists: alreadyIds.size,
+        });
+      }
+
+      const records = newIds.map((studentId) => ({
+        date,
+        studentId,
+        semester,
+        major: sessionMajor,
+        sessionId: session._id,
+        inputBy: currentUser._id,
+      }));
+
+      const result = await Attendance.insertMany(records);
+
+      if (
+        session.note &&
+        /no (students?|one) (came|attended)/i.test(session.note)
+      ) {
+        session.note = undefined;
+        await session.save();
+      }
+
       await Log.create({
         user: currentUser._id,
         userRole: currentUser.role,
         action: "ATTENDANCE_MARK",
         resourceType: "attendance",
         details: JSON.stringify({
-          action: "Attendance Marking Failed - Missing Required Fields",
-          user: {
+          action: "Senior Semester Attendance Marked (Session)",
+          session: {
+            id: session._id,
+            date,
+            semester,
+            major: sessionMajor,
+          },
+          addedCount: result.length,
+          alreadyExisting: alreadyIds.size,
+          studentsAdded: validStudents
+            .filter((s) => newIds.includes(s._id.toString()))
+            .map((s) => ({
+              id: s._id,
+              name: s.name,
+              collegeId: s.collegeId,
+              email: s.email,
+              role: s.role,
+            })),
+          markedBy: {
             id: currentUser._id,
             name: currentUser.name,
-            collegeId: currentUser.collegeId,
-            role: currentUser.role
+            role: currentUser.role,
           },
-          missingFields: missingFields,
-          providedData: {
-            date: date || 'missing',
-            semester: semester || 'missing',
-            studentCount: studentIds?.length || 0
-          },
-          timestamp: new Date().toISOString()
-        })
+          timestamp: new Date().toISOString(),
+        }),
       });
-      
-      return NextResponse.json(
-        { success: false, message: "Date, semester, and student IDs are required" },
-        { status: 400 }
-      );
+
+      return NextResponse.json({
+        success: true,
+        message: `Attendance added for ${result.length} student(s)`,
+        addedCount: result.length,
+        alreadyExists: alreadyIds.size,
+      });
+    }
+    // ✅ ========== end 7th/8th branch ==========
+
+    // ========== 1st–6th: legacy + auto-session ==========
+    const students = await User.find({
+      _id: { $in: studentIds },
+      role: { $in: ["student", "cr"] },
+    }).select("name collegeId email role");
+
+    let implicitSession = await ClassSession.findOne({
+      date,
+      semester,
+      major: null,
+    });
+    if (!implicitSession) {
+      try {
+        implicitSession = await ClassSession.create({
+          date,
+          semester,
+          major: null,
+          inputBy: currentUser._id,
+          status: "held",
+          isAutoGenerated: true,
+        });
+      } catch (err) {
+        if (err.code === 11000) {
+          implicitSession = await ClassSession.findOne({
+            date,
+            semester,
+            major: null,
+          });
+        } else {
+          throw err;
+        }
+      }
     }
 
-    // Get student details for logging
-    const students = await User.find({ 
-      _id: { $in: studentIds },
-      role: { $in: ['student', 'cr'] }
-    }).select('name collegeId email role semester');
-
-    // Check if attendance already exists for this date and students
     const existingAttendance = await Attendance.find({
       date,
       semester,
       studentId: { $in: studentIds },
     }).populate("studentId", "name collegeId email");
 
-    const existingStudentIds = new Set(existingAttendance.map(a => a.studentId._id.toString()));
-    const existingStudentsDetails = existingAttendance.map(a => ({
+    const existingStudentIds = new Set(
+      existingAttendance.map((a) => a.studentId._id.toString())
+    );
+    const existingStudentsDetails = existingAttendance.map((a) => ({
       id: a.studentId._id,
       name: a.studentId.name,
       collegeId: a.studentId.collegeId,
       email: a.studentId.email,
       attendanceId: a._id,
-      createdAt: a.createdAt
     }));
-    
-    // Filter out students who already have attendance
-    const newStudentIds = studentIds.filter(id => !existingStudentIds.has(id));
-    const newStudentsDetails = students.filter(s => newStudentIds.includes(s._id.toString()));
 
-    // Log attendance marking attempt
-    await Log.create({
-      user: currentUser._id,
-      userRole: currentUser.role,
-      action: "ATTENDANCE_MARK",
-      resourceType: "attendance",
-      details: JSON.stringify({
-        action: "Attendance Marking Attempt",
-        user: {
-          id: currentUser._id,
-          name: currentUser.name,
-          collegeId: currentUser.collegeId,
-          role: currentUser.role,
-          email: currentUser.email
-        },
-        attendanceDetails: {
-          date: date,
-          semester: semester,
-          totalAttempted: studentIds.length,
-          newStudents: newStudentIds.length,
-          alreadyPresent: existingStudentIds.size
-        },
-        studentsList: students.map(s => ({
-          id: s._id,
-          name: s.name,
-          collegeId: s.collegeId,
-          email: s.email,
-          role: s.role
-        })),
-        existingRecords: existingStudentsDetails,
-        timestamp: new Date().toISOString()
-      })
-    });
+    const newStudentIdsList = studentIds.filter(
+      (id) => !existingStudentIds.has(id)
+    );
 
-    if (newStudentIds.length === 0) {
-      await Log.create({
-        user: currentUser._id,
-        userRole: currentUser.role,
-        action: "ATTENDANCE_MARK",
-        resourceType: "attendance",
-        details: JSON.stringify({
-          action: "Attendance Marking - All Students Already Marked",
-          user: {
-            id: currentUser._id,
-            name: currentUser.name,
-            collegeId: currentUser.collegeId
-          },
-          attendanceDetails: {
-            date: date,
-            semester: semester,
-            totalAttempted: studentIds.length,
-            alreadyMarked: existingStudentIds.size,
-            existingStudents: existingStudentsDetails
-          },
-          timestamp: new Date().toISOString()
-        })
-      });
-      
+    if (newStudentIdsList.length === 0) {
       return NextResponse.json({
         success: true,
         message: "Attendance already marked for all selected students",
@@ -232,22 +390,21 @@ export async function POST(request) {
       });
     }
 
-    // Create attendance records for new students
-    const attendanceRecords = newStudentIds.map(studentId => ({
+    const attendanceRecords = newStudentIdsList.map((studentId) => ({
       date,
       studentId,
       semester,
+      major: null,
+      sessionId: implicitSession._id,
       inputBy: currentUser._id,
     }));
 
     const result = await Attendance.insertMany(attendanceRecords);
 
-    // Get details of newly added attendance records
-    const newAttendanceRecords = await Attendance.find({
-      _id: { $in: result.map(r => r._id) }
-    }).populate("studentId", "name collegeId email");
+    const newlyAddedStudents = await User.find({
+      _id: { $in: newStudentIdsList },
+    }).select("name collegeId email role");
 
-    // Log successful attendance marking
     await Log.create({
       user: currentUser._id,
       userRole: currentUser.role,
@@ -260,32 +417,26 @@ export async function POST(request) {
           name: currentUser.name,
           collegeId: currentUser.collegeId,
           role: currentUser.role,
-          email: currentUser.email
+          email: currentUser.email,
         },
         attendanceDetails: {
-          date: date,
-          semester: semester,
+          date,
+          semester,
+          sessionId: implicitSession._id,
           totalAttempted: studentIds.length,
           successfullyAdded: result.length,
-          alreadyPresent: existingStudentIds.size
+          alreadyPresent: existingStudentIds.size,
         },
-        studentsAdded: newStudentsDetails.map(s => ({
+        studentsAdded: newlyAddedStudents.map((s) => ({
           id: s._id,
           name: s.name,
           collegeId: s.collegeId,
           email: s.email,
-          role: s.role
-        })),
-        attendanceRecords: newAttendanceRecords.map(record => ({
-          id: record._id,
-          studentId: record.studentId._id,
-          studentName: record.studentId.name,
-          studentCollegeId: record.studentId.collegeId,
-          createdAt: record.createdAt
+          role: s.role,
         })),
         existingStudents: existingStudentsDetails,
-        timestamp: new Date().toISOString()
-      })
+        timestamp: new Date().toISOString(),
+      }),
     });
 
     return NextResponse.json({
@@ -296,41 +447,27 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("Error adding attendance:", error);
-    
-    // Log error with details
+
     try {
-      const { date, semester, studentIds } = await request.json().catch(() => ({}));
-      
       await Log.create({
-        user: currentUser?._id || null,
-        userRole: currentUser?.role || 'unknown',
+        user: null,
+        userRole: "unknown",
         action: "ATTENDANCE_MARK",
         resourceType: "attendance",
         details: JSON.stringify({
           action: "Attendance Marking Failed - System Error",
-          user: currentUser ? {
-            id: currentUser._id,
-            name: currentUser.name,
-            collegeId: currentUser.collegeId,
-            role: currentUser.role
-          } : null,
-          attemptedData: {
-            date: date,
-            semester: semester,
-            studentCount: studentIds?.length || 0
-          },
           error: {
             name: error.name,
             message: error.message,
             stack: error.stack,
-            timestamp: new Date().toISOString()
-          }
-        })
+            timestamp: new Date().toISOString(),
+          },
+        }),
       });
     } catch (logError) {
-      console.error('Failed to create error log:', logError);
+      console.error("Failed to create error log:", logError);
     }
-    
+
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500 }
@@ -338,31 +475,18 @@ export async function POST(request) {
   }
 }
 
-// DELETE - Remove attendance record
+// ============================================================
+// DELETE — remove an individual attendance record
+// ============================================================
 export async function DELETE(request) {
   try {
     await connectToDatabase();
     const currentUser = await getCurrentUser();
 
-    if (!currentUser || (currentUser.role !== "faculty" && currentUser.role !== "admin")) {
-      // Log unauthorized attempt
-      await Log.create({
-        user: currentUser?._id || null,
-        userRole: currentUser?.role || 'unknown',
-        action: "ATTENDANCE_DELETE",
-        resourceType: "attendance",
-        details: JSON.stringify({
-          action: "Unauthorized Attendance Deletion Attempt",
-          user: currentUser ? {
-            id: currentUser._id,
-            name: currentUser.name,
-            collegeId: currentUser.collegeId,
-            role: currentUser.role
-          } : null,
-          timestamp: new Date().toISOString()
-        })
-      });
-      
+    if (
+      !currentUser ||
+      (currentUser.role !== "faculty" && currentUser.role !== "admin")
+    ) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 403 }
@@ -373,101 +497,38 @@ export async function DELETE(request) {
     const attendanceId = searchParams.get("id");
 
     if (!attendanceId) {
-      await Log.create({
-        user: currentUser._id,
-        userRole: currentUser.role,
-        action: "ATTENDANCE_DELETE",
-        resourceType: "attendance",
-        details: JSON.stringify({
-          action: "Attendance Deletion Failed - Missing ID",
-          user: {
-            id: currentUser._id,
-            name: currentUser.name,
-            collegeId: currentUser.collegeId,
-            role: currentUser.role
-          },
-          timestamp: new Date().toISOString()
-        })
-      });
-      
       return NextResponse.json(
         { success: false, message: "Attendance ID is required" },
         { status: 400 }
       );
     }
 
-    // Get attendance record with student details before deletion
     const attendance = await Attendance.findById(attendanceId)
-      .populate("studentId", "name collegeId email phone role")
+      .populate("studentId", "name collegeId email role")
       .populate("inputBy", "name collegeId");
 
     if (!attendance) {
-      await Log.create({
-        user: currentUser._id,
-        userRole: currentUser.role,
-        action: "ATTENDANCE_DELETE",
-        resourceType: "attendance",
-        details: JSON.stringify({
-          action: "Attendance Deletion Failed - Record Not Found",
-          user: {
-            id: currentUser._id,
-            name: currentUser.name,
-            collegeId: currentUser.collegeId,
-            role: currentUser.role
-          },
-          attendanceId: attendanceId,
-          timestamp: new Date().toISOString()
-        })
-      });
-      
       return NextResponse.json(
         { success: false, message: "Attendance record not found" },
         { status: 404 }
       );
     }
 
-    // Log deletion attempt with student info
-    await Log.create({
-      user: currentUser._id,
-      userRole: currentUser.role,
-      action: "ATTENDANCE_DELETE",
-      resourceType: "attendance",
-      resourceId: attendanceId,
-      details: JSON.stringify({
-        action: "Attendance Deletion Attempt",
-        user: {
-          id: currentUser._id,
-          name: currentUser.name,
-          collegeId: currentUser.collegeId,
-          role: currentUser.role,
-          email: currentUser.email
-        },
-        attendanceRecord: {
-          id: attendance._id,
-          date: attendance.date,
-          semester: attendance.semester,
-          student: {
-            id: attendance.studentId?._id,
-            name: attendance.studentId?.name,
-            collegeId: attendance.studentId?.collegeId,
-            email: attendance.studentId?.email,
-            phone: attendance.studentId?.phone,
-            role: attendance.studentId?.role
-          },
-          markedBy: {
-            id: attendance.inputBy?._id,
-            name: attendance.inputBy?.name,
-            collegeId: attendance.inputBy?.collegeId
-          },
-          createdAt: attendance.createdAt
-        },
-        timestamp: new Date().toISOString()
-      })
-    });
-
     await Attendance.findByIdAndDelete(attendanceId);
 
-    // Log successful deletion
+    // If this was the last attendance in an auto-generated session, clean it up
+    if (attendance.sessionId) {
+      const remaining = await Attendance.countDocuments({
+        sessionId: attendance.sessionId,
+      });
+      if (remaining === 0) {
+        const sess = await ClassSession.findById(attendance.sessionId);
+        if (sess && sess.isAutoGenerated) {
+          await ClassSession.findByIdAndDelete(attendance.sessionId);
+        }
+      }
+    }
+
     await Log.create({
       user: currentUser._id,
       userRole: currentUser.role,
@@ -481,30 +542,24 @@ export async function DELETE(request) {
           name: currentUser.name,
           collegeId: currentUser.collegeId,
           role: currentUser.role,
-          email: currentUser.email
+          email: currentUser.email,
         },
         deletedRecord: {
           id: attendance._id,
           date: attendance.date,
           semester: attendance.semester,
+          major: attendance.major || null,
+          sessionId: attendance.sessionId || null,
           student: {
             id: attendance.studentId?._id,
             name: attendance.studentId?.name,
             collegeId: attendance.studentId?.collegeId,
             email: attendance.studentId?.email,
-            phone: attendance.studentId?.phone,
-            role: attendance.studentId?.role
+            role: attendance.studentId?.role,
           },
-          markedBy: {
-            id: attendance.inputBy?._id,
-            name: attendance.inputBy?.name,
-            collegeId: attendance.inputBy?.collegeId
-          },
-          markedAt: attendance.createdAt,
-          deletedAt: new Date().toISOString()
         },
-        timestamp: new Date().toISOString()
-      })
+        timestamp: new Date().toISOString(),
+      }),
     });
 
     return NextResponse.json({
@@ -513,38 +568,6 @@ export async function DELETE(request) {
     });
   } catch (error) {
     console.error("Error deleting attendance:", error);
-    
-    // Log error with details
-    try {
-      const { searchParams } = new URL(request.url);
-      const attendanceId = searchParams.get("id");
-      
-      await Log.create({
-        user: currentUser?._id || null,
-        userRole: currentUser?.role || 'unknown',
-        action: "ATTENDANCE_DELETE",
-        resourceType: "attendance",
-        resourceId: attendanceId,
-        details: JSON.stringify({
-          action: "Attendance Deletion Failed - System Error",
-          user: currentUser ? {
-            id: currentUser._id,
-            name: currentUser.name,
-            collegeId: currentUser.collegeId,
-            role: currentUser.role
-          } : null,
-          attendanceId: attendanceId,
-          error: {
-            name: error.name,
-            message: error.message,
-            timestamp: new Date().toISOString()
-          }
-        })
-      });
-    } catch (logError) {
-      console.error('Failed to create error log:', logError);
-    }
-    
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500 }

@@ -27,7 +27,8 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
+      {/* pb-16 prevents the bottom nav from covering content on mobile */}
+      <body className="min-h-screen bg-gray-50 pb-16 sm:pb-0">
         <AuthProvider>
           <MainLayout>
             {children}

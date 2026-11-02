@@ -1,6 +1,25 @@
 // app/models/User.js
 import mongoose from "mongoose";
 
+const studentCommentSchema = new mongoose.Schema(
+  {
+    text: { type: String, required: true, trim: true },
+    authorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    authorName: { type: String, required: true },
+    authorRole: {
+      type: String,
+      enum: ["admin", "faculty"],
+      required: true,
+    },
+    date: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -34,6 +53,7 @@ const userSchema = new mongoose.Schema(
     bloodGroup: {
       type: String,
     },
+    bloodDonationDates: [{ type: Date }],
     designation: {
       type: String,
     },
@@ -45,6 +65,21 @@ const userSchema = new mongoose.Schema(
       required: true,
       enum: ["student", "admin", "faculty", "cr"],
       default: "student",
+    },
+    major: {
+      type: String,
+      enum: [
+        "finance & banking",
+        "marketing",
+        "management",
+        "accounting",
+        null,
+      ],
+      default: null,
+    },
+    comments: {
+      type: [studentCommentSchema],
+      default: [],
     },
     isDepthead: {
       type: Boolean,

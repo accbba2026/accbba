@@ -15,11 +15,21 @@ import {
   FiStar,
   FiPrinter,
   FiDroplet,
+  FiBriefcase,
 } from "react-icons/fi";
 import { FaStar, FaUsers, FaGraduationCap } from "react-icons/fa";
 import toast from "react-hot-toast";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+const MAJOR_OPTIONS = [
+  "finance & banking",
+  "marketing",
+  "management",
+  "accounting",
+];
+
+const SENIOR_SEMESTERS = ["7th", "8th"];
 
 const CRStudentsPage = () => {
   const { user } = useAuth();
@@ -27,6 +37,7 @@ const CRStudentsPage = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchType, setSearchType] = useState("name");
+  const [majorFilter, setMajorFilter] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
 
   // Add Student Modal
@@ -38,6 +49,7 @@ const CRStudentsPage = () => {
     email: "",
     bloodGroup: "",
     semester: "",
+    major: "",
   });
 
   // Edit Student Modal
@@ -48,6 +60,7 @@ const CRStudentsPage = () => {
     phone: "",
     email: "",
     bloodGroup: "",
+    major: "",
   });
 
   const crSemester = user?.semester || "1st";
@@ -63,7 +76,7 @@ const CRStudentsPage = () => {
         let allStudents = [...data.data];
 
         // Add the CR themselves if not present
-        if (user && user.role === "cr" && user.semester === crSemester) {
+        if (user && user.role === "cr" && user?.semester === crSemester) {
           const crExists = allStudents.some(
             (s) => s.collegeId === user.collegeId,
           );
@@ -98,7 +111,19 @@ const CRStudentsPage = () => {
   }, [user]);
 
   // Search filter
+  // Search filter
   const filteredStudents = students.filter((student) => {
+    // ✅ Major filter (only meaningful for 7th/8th)
+    if (majorFilter) {
+      // If user filtered by a specific major, hide students who don't match
+      if (
+        !SENIOR_SEMESTERS.includes(student.semester) ||
+        student.major !== majorFilter
+      ) {
+        return false;
+      }
+    }
+
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     if (searchType === "name")
@@ -154,6 +179,7 @@ const CRStudentsPage = () => {
         email: "",
         bloodGroup: "",
         semester: "",
+        major: "",
       });
       setIsAddModalOpen(false);
       await fetchStudents();
@@ -179,6 +205,7 @@ const CRStudentsPage = () => {
       phone: student.phone || "",
       email: student.email || "",
       bloodGroup: student.bloodGroup || "",
+      major: student.major || "",
     });
     setIsEditModalOpen(true);
   };
@@ -189,18 +216,26 @@ const CRStudentsPage = () => {
     setMessage({ type: "", text: "" });
 
     try {
+      // ✅ Only send major for 7th/8th semester students
+      const isSeniorSemester = SENIOR_SEMESTERS.includes(
+        editingStudent?.semester,
+      );
+
+      const payload = {
+        id: editingStudent._id,
+        name: editFormData.name,
+        phone: editFormData.phone,
+        email: editFormData.email,
+        bloodGroup: editFormData.bloodGroup,
+        ...(isSeniorSemester ? { major: editFormData.major || "" } : {}),
+      };
+
       await toast.promise(
         (async () => {
           const response = await fetch("/api/cr/update-student", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: editingStudent._id,
-              name: editFormData.name,
-              phone: editFormData.phone,
-              email: editFormData.email,
-              bloodGroup: editFormData.bloodGroup,
-            }),
+            body: JSON.stringify(payload),
           });
 
           const data = await response.json();
@@ -218,7 +253,6 @@ const CRStudentsPage = () => {
         },
       );
 
-      // On success:
       setIsEditModalOpen(false);
       setEditingStudent(null);
       await fetchStudents();
@@ -231,6 +265,7 @@ const CRStudentsPage = () => {
   };
 
   // ✅ Print: College ID first, then name, phone, and blank space for checkmark
+  // ✅ Print: College ID first, then name, phone, major (7th/8th only), and blank checkmark
   const handlePrint = () => {
     const studentsToPrint = [...filteredStudents].sort((a, b) =>
       (a.collegeId || "").localeCompare(b.collegeId || ""),
@@ -240,6 +275,9 @@ const CRStudentsPage = () => {
       window.alert("No students to print.");
       return;
     }
+
+    // ✅ Show Major column ONLY for 7th & 8th semester lists
+    const showMajorColumn = SENIOR_SEMESTERS.includes(crSemester);
 
     const printWindow = window.open("", "_blank", "width=900,height=800");
     if (!printWindow) {
@@ -255,10 +293,18 @@ const CRStudentsPage = () => {
           <td class="id">${s.collegeId || "—"}</td>
           <td class="name">${s.name || "—"}</td>
           <td class="phone">${s.phone || "—"}</td>
+          ${showMajorColumn ? `<td class="major">${s.major || "—"}</td>` : ""}
           <td class="blank"></td>
         </tr>`,
       )
       .join("");
+
+    const majorFilterLabel = majorFilter
+      ? majorFilter
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ")
+      : "All Majors";
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -276,12 +322,13 @@ const CRStudentsPage = () => {
             .header h1 { margin: 0; color: #15803d; font-size: 20px; }
             .header h2 { margin: 4px 0 0; font-size: 15px; font-weight: 500; color: #444; }
             .header p { margin: 4px 0 0; font-size: 11px; color: #666; }
-            .meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px; color: #444; }
+            .meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px; color: #444; flex-wrap: wrap; gap: 6px; }
             table { width: 100%; border-collapse: collapse; font-size: 12px; }
             thead { background: #15803d; color: white; }
             th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
             th { font-weight: 600; }
             tbody tr:nth-child(even) { background: #f9fafb; }
+            td.major { text-transform: capitalize; }
             td.blank { min-width: 120px; background: #fff !important; }
             .footer { margin-top: 24px; font-size: 10px; color: #666; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
             .note { font-size: 10px; color: #666; margin-top: 6px; font-style: italic; }
@@ -301,14 +348,20 @@ const CRStudentsPage = () => {
           <div class="meta">
             <span>Total Students: <strong>${studentsToPrint.length}</strong></span>
             <span>Semester: <strong>${crSemester}</strong></span>
+            ${
+              showMajorColumn
+                ? `<span>Major: <strong>${majorFilterLabel}</strong></span>`
+                : ""
+            }
           </div>
           <table>
             <thead>
               <tr>
                 <th style="width: 50px;">#</th>
-                <th style="width: 120px;">College ID</th>
+                <th style="width: 110px;">College ID</th>
                 <th>Name</th>
-                <th style="width: 140px;">Phone</th>
+                <th style="width: 130px;">Phone</th>
+                ${showMajorColumn ? `<th style="width: 140px;">Major</th>` : ""}
                 <th>Notes / Checkmark</th>
               </tr>
             </thead>
@@ -441,6 +494,30 @@ const CRStudentsPage = () => {
                 )}
               </div>
             </div>
+            {/* ✅ Major Filter — only for 7th & 8th semester CRs */}
+            {SENIOR_SEMESTERS.includes(crSemester) && (
+              <div className="md:w-52">
+                <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-1.5">
+                  <FiBriefcase className="text-indigo-500" size={13} />
+                  Filter by Major
+                </label>
+                <select
+                  value={majorFilter}
+                  onChange={(e) => setMajorFilter(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+                >
+                  <option value="">All majors</option>
+                  {MAJOR_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m
+                        .split(" ")
+                        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                        .join(" ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="md:self-end">
               <button
                 onClick={fetchStudents}
@@ -459,10 +536,16 @@ const CRStudentsPage = () => {
             <div>
               <p className="text-green-100 text-sm">Total Students</p>
               <p className="text-white text-3xl font-bold">{students.length}</p>
-              {searchTerm && (
+              {(searchTerm || majorFilter) && (
                 <p className="text-green-100 text-xs mt-1">
                   Showing {filteredStudents.length} match
                   {filteredStudents.length !== 1 ? "es" : ""}
+                  {majorFilter
+                    ? ` · ${majorFilter
+                        .split(" ")
+                        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                        .join(" ")}`
+                    : ""}
                 </p>
               )}
             </div>
@@ -481,6 +564,7 @@ const CRStudentsPage = () => {
                   <th className="px-6 py-4 text-left">#</th>
                   <th className="px-6 py-4 text-left">Student</th>
                   <th className="px-6 py-4 text-left">College ID</th>
+                  <th className="px-6 py-4 text-left">Major</th>
                   <th className="px-6 py-4 text-left">Blood</th>
                   <th className="px-6 py-4 text-left">Phone</th>
                   <th className="px-6 py-4 text-left">Email</th>
@@ -544,6 +628,16 @@ const CRStudentsPage = () => {
                         <span className="font-mono text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
                           {student.collegeId}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {SENIOR_SEMESTERS.includes(student.semester) &&
+                        student.major ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-indigo-700 capitalize">
+                            {student.major}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {student.bloodGroup ? (
@@ -757,10 +851,11 @@ const CRStudentsPage = () => {
         )}
 
         {/* Edit Student Modal */}
+
         {isEditModalOpen && editingStudent && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-              <div className="flex justify-between items-center p-6 border-b border-gray-200">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
+              <div className="flex justify-between items-center p-6 border-b border-gray-200 shrink-0">
                 <h2 className="text-xl font-semibold text-gray-900">
                   Edit Student
                 </h2>
@@ -772,7 +867,10 @@ const CRStudentsPage = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleUpdateStudent} className="p-6 space-y-4">
+              <form
+                onSubmit={handleUpdateStudent}
+                className="p-6 space-y-4 overflow-y-auto flex-1"
+              >
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium">
                     Full Name *
@@ -848,13 +946,41 @@ const CRStudentsPage = () => {
                   </select>
                 </div>
 
+                {/* ✅ Major — only for 7th & 8th semester */}
+                {SENIOR_SEMESTERS.includes(editingStudent?.semester) && (
+                  <div>
+                    <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
+                      <FiBriefcase className="text-indigo-500" /> Major Subject
+                    </label>
+                    <select
+                      name="major"
+                      value={editFormData.major}
+                      onChange={handleEditInputChange}
+                      className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="">Not assigned</option>
+                      {MAJOR_OPTIONS.map((m) => (
+                        <option key={m} value={m}>
+                          {m
+                            .split(" ")
+                            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                            .join(" ")}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Required for 7th & 8th semester students
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium">
                     Semester
                   </label>
                   <input
                     type="text"
-                    value={editingStudent.semester}
+                    value={editingStudent?.semester}
                     disabled
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                   />

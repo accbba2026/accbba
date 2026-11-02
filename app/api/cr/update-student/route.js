@@ -7,6 +7,14 @@ import { getCurrentUser } from '@/app/lib/authUtils';
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+const VALID_MAJORS = [
+  'finance & banking',
+  'marketing',
+  'management',
+  'accounting',
+];
+const SENIOR_SEMESTERS = ['7th', '8th'];
+
 export async function PUT(request) {
   try {
     await connectToDatabase();
@@ -39,8 +47,8 @@ export async function PUT(request) {
       );
     }
 
-    // ✅ Added bloodGroup
-    const { id, name, phone, email, bloodGroup } = await request.json();
+    // ✅ Added major
+    const { id, name, phone, email, bloodGroup, major } = await request.json();
 
     if (!id) {
       return NextResponse.json(
@@ -63,6 +71,7 @@ export async function PUT(request) {
       phone: student.phone,
       email: student.email,
       bloodGroup: student.bloodGroup,
+      major: student.major || null,
       semester: student.semester,
       role: student.role,
       status: student.status,
@@ -73,14 +82,6 @@ export async function PUT(request) {
     if (student.semester !== currentUser.semester) {
       return NextResponse.json(
         { success: false, message: 'You can only update students in your semester' },
-        { status: 403 }
-      );
-    }
-
-    // Only allow updating student accounts (not other CRs)
-    if (student.role !== 'student') {
-      return NextResponse.json(
-        { success: false, message: 'Can only update student accounts' },
         { status: 403 }
       );
     }
@@ -116,12 +117,42 @@ export async function PUT(request) {
       }
     }
 
-    // ✅ Validate blood group
-    if (bloodGroup !== undefined && bloodGroup !== null && bloodGroup !== '' && !VALID_BLOOD_GROUPS.includes(bloodGroup)) {
+    // Validate blood group
+    if (
+      bloodGroup !== undefined &&
+      bloodGroup !== null &&
+      bloodGroup !== '' &&
+      !VALID_BLOOD_GROUPS.includes(bloodGroup)
+    ) {
       return NextResponse.json(
         {
           success: false,
           message: `Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Major validation — only allowed for 7th & 8th semester
+    const isSeniorSemester = SENIOR_SEMESTERS.includes(student.semester);
+    const majorProvided =
+      major !== undefined && major !== null && major !== '';
+
+    if (majorProvided && !isSeniorSemester) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Major can only be set for 7th & 8th semester students (current: ${student.semester})`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (majorProvided && !VALID_MAJORS.includes(major)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Major must be one of: ${VALID_MAJORS.join(', ')}`,
         },
         { status: 400 }
       );
@@ -132,7 +163,16 @@ export async function PUT(request) {
     if (name && name !== student.name) updatedFields.push('name');
     if (phone !== undefined && phone !== student.phone) updatedFields.push('phone');
     if (email !== undefined && email !== student.email) updatedFields.push('email');
-    if (bloodGroup !== undefined && bloodGroup !== student.bloodGroup) updatedFields.push('bloodGroup');
+    if (bloodGroup !== undefined && bloodGroup !== student.bloodGroup)
+      updatedFields.push('bloodGroup');
+    // ✅ only count major when it's actually allowed
+    if (
+      isSeniorSemester &&
+      major !== undefined &&
+      major !== (student.major || null)
+    ) {
+      updatedFields.push('major');
+    }
 
     // Build update
     const updateData = {};
@@ -146,14 +186,21 @@ export async function PUT(request) {
     }
 
     if (email !== undefined) {
-      if (email && email.trim() !== '') updateData.email = email.trim().toLowerCase();
+      if (email && email.trim() !== '')
+        updateData.email = email.trim().toLowerCase();
       else unsetData.email = '';
     }
 
-    // ✅ Blood group
     if (bloodGroup !== undefined) {
-      if (bloodGroup && bloodGroup.trim() !== '') updateData.bloodGroup = bloodGroup.trim();
+      if (bloodGroup && bloodGroup.trim() !== '')
+        updateData.bloodGroup = bloodGroup.trim();
       else unsetData.bloodGroup = '';
+    }
+
+    // ✅ Major — only apply for senior semesters
+    if (isSeniorSemester && major !== undefined) {
+      if (major && major.trim() !== '') updateData.major = major.trim();
+      else unsetData.major = '';
     }
 
     const updatedStudent = await User.findByIdAndUpdate(
@@ -171,15 +218,28 @@ export async function PUT(request) {
       changes.push(`Name: "${originalStudent.name}" → "${updatedStudent.name}"`);
     if (updatedFields.includes('phone'))
       changes.push(
-        `Phone: "${originalStudent.phone || 'Not set'}" → "${updatedStudent.phone || 'Removed'}"`
+        `Phone: "${originalStudent.phone || 'Not set'}" → "${
+          updatedStudent.phone || 'Removed'
+        }"`
       );
     if (updatedFields.includes('email'))
       changes.push(
-        `Email: "${originalStudent.email || 'Not set'}" → "${updatedStudent.email || 'Removed'}"`
+        `Email: "${originalStudent.email || 'Not set'}" → "${
+          updatedStudent.email || 'Removed'
+        }"`
       );
     if (updatedFields.includes('bloodGroup'))
       changes.push(
-        `Blood Group: "${originalStudent.bloodGroup || 'Not set'}" → "${updatedStudent.bloodGroup || 'Removed'}"`
+        `Blood Group: "${originalStudent.bloodGroup || 'Not set'}" → "${
+          updatedStudent.bloodGroup || 'Removed'
+        }"`
+      );
+    // ✅ Major
+    if (updatedFields.includes('major'))
+      changes.push(
+        `Major: "${originalStudent.major || 'Not set'}" → "${
+          updatedStudent.major || 'Removed'
+        }"`
       );
 
     await Log.create({
@@ -205,6 +265,7 @@ export async function PUT(request) {
           email: updatedStudent.email || 'Not set',
           phone: updatedStudent.phone || 'Not set',
           bloodGroup: updatedStudent.bloodGroup || 'Not set',
+          major: updatedStudent.major || 'Not set',
           semester: updatedStudent.semester,
           role: updatedStudent.role,
         },

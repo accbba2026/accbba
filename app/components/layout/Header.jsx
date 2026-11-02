@@ -5,20 +5,15 @@ import Image from "next/image";
 import { useAuth } from "@/app/context/AuthContext";
 import ACCLOGO from "../../assets/acclogo.png";
 import BBALOGO from "../../assets/bbalogo.png";
-import { FiLogOut } from "react-icons/fi";
+import { FiLogOut, FiHome, FiGrid } from "react-icons/fi";
+import { FaTint } from "react-icons/fa";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const Header = () => {
   const { logout, user } = useAuth();
+  const pathname = usePathname();
 
-  // Get last part of name (last word after space)
-  const getLastName = (fullName) => {
-    if (!fullName) return "Guest";
-    const nameParts = fullName.trim().split(" ");
-    return nameParts[nameParts.length - 1];
-  };
-
-  // Get display name (last name or first name if only one word)
   const getDisplayName = (fullName) => {
     if (!fullName) return "Guest";
     const nameParts = fullName.trim().split(" ");
@@ -26,80 +21,177 @@ const Header = () => {
     return nameParts[nameParts.length - 1];
   };
 
+  // Build nav items — Dashboard link mirrors the Links component logic
+  const navItems = [
+    { href: "/", label: "Home", icon: FiHome },
+    { href: "/blood", label: "Blood", icon: FaTint },
+  ];
+
+  if (user && user?.role !== "student") {
+    navItems.push({
+      href: `/${user.role}/dashboard`,
+      label: "Dashboard",
+      icon: FiGrid,
+    });
+  }
+
   return (
-    <header className="w-full bg-white shadow-md sticky top-0 z-50">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between py-3 md:py-4">
-          {/* Left side - ACC College Logo */}
-          <div className="flex-shrink-0">
-            <div className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16">
+    <>
+      {/* Top Sticky Header */}
+      <header className="w-full bg-white shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-3 sm:px-6 lg:px-8">
+          {/* Top Row - Logos, Title, User Info */}
+          <div className="flex items-center justify-between py-2">
+            {/* Left - ACC Logo */}
+            <div className="flex-shrink-0">
               <Link href="/">
-                <Image
-                  src={ACCLOGO}
-                  alt="ACC College Logo"
-                  sizes="(max-width: 640px) 40px, (max-width: 768px) 56px, (max-width: 1024px) 64px, 80px"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </Link>
-            </div>
-          </div>
-
-          {/* Center - Department Name */}
-          <div className="flex-1 text-center px-2 sm:px-4">
-            <h1 className="text-base sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-800 tracking-tight">
-              Department of <span className="text-blue-600">BBA</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1 hidden sm:block">
-              Bachelor of Business Administration
-            </p>
-          </div>
-
-          {/* Right side - BBA Logo and User Info */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            {/* BBA Department Logo */}
-            <div className="relative w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14">
-              <Link href="/">
-                <Image
-                  src={BBALOGO}
-                  alt="BBA Department Logo"
-                  fill
-                  sizes="(max-width: 640px) 32px, (max-width: 768px) 48px, (max-width: 1024px) 56px, 64px"
-                  className="object-contain"
-                  priority
-                />
+                <div className="relative w-9 h-9 sm:w-11 sm:h-11">
+                  <Image
+                    src={ACCLOGO}
+                    alt="ACC College Logo"
+                    sizes="(max-width: 640px) 36px, 44px"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                </div>
               </Link>
             </div>
 
-            {/* Vertical Divider - hidden on very small screens */}
-            <div className="h-8 w-px bg-gray-300 hidden sm:block"></div>
+            {/* Center - Title with subtitle */}
+            <div className="flex-1 text-center px-2">
+              <h1 className="text-sm sm:text-lg md:text-xl font-bold text-gray-800 tracking-tight leading-tight">
+                Department of <span className="text-blue-600">BBA</span>
+              </h1>
+              <p className="hidden sm:block text-xs text-gray-500 leading-tight mt-0.5">
+                Bachelor of Business Administration
+              </p>
+            </div>
 
-            {/* User Greeting and Logout */}
-            <div className="text-right">
-              <p className="text-xs sm:text-sm font-medium text-gray-700">
-                Hi,{" "}
-                <span className="text-blue-600 font-semibold">
-                  {getDisplayName(user?.name)}
-                </span>
-              </p>
-              <p className="text-xs text-gray-400">
-                ID:{" "}
-                <span className="font-mono">
-                  {user?.collegeId || user?.userId || "N/A"}
-                </span>
-              </p>
-              <button
-                onClick={logout}
-                className="text-xs cursor-pointer text-red-500 hover:text-red-700 mt-1 transition-colors flex items-center gap-1 ml-auto"
-              >
-                <FiLogOut size={12} /> Logout
-              </button>
+            {/* Right - BBA Logo + User Info */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Link href="/">
+                <div className="relative w-8 h-8 sm:w-10 sm:h-10">
+                  <Image
+                    src={BBALOGO}
+                    alt="BBA Department Logo"
+                    fill
+                    sizes="(max-width: 640px) 32px, 40px"
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+              </Link>
+
+              <div className="h-7 w-px bg-gray-200 hidden sm:block"></div>
+
+              {/* User info */}
+              <div className="flex items-center gap-2">
+                <div className="text-right leading-tight">
+                  <p className="text-[11px] sm:text-xs font-medium text-gray-700">
+                    Hi,{" "}
+                    <span className="text-blue-600 font-semibold">
+                      {getDisplayName(user?.name)}
+                    </span>
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-mono leading-tight">
+                    {user?.collegeId || user?.userId || "N/A"}
+                  </p>
+                </div>
+                <button
+                  onClick={logout}
+                  aria-label="Logout"
+                  title="Logout"
+                  className="cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+                >
+                  <FiLogOut size={15} />
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Inline Navigation — sm and up only */}
+          <nav className="hidden sm:flex items-center justify-center gap-2 pb-1.5 border-t border-gray-100 pt-1.5">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`
+                    group flex items-center gap-1.5
+                    px-4 py-1 rounded-full text-xs font-medium
+                    transition-all duration-200 ease-in-out
+                    ${
+                      isActive
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                    }
+                  `}
+                >
+                  <Icon
+                    size={13}
+                    className={`transition-transform duration-200 ${
+                      isActive ? "scale-110" : "group-hover:scale-110"
+                    }`}
+                  />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Mobile Bottom Navigation — fixed at bottom of screen */}
+      <nav
+        className="
+          sm:hidden
+          fixed bottom-0 left-0 right-0 z-50
+          bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]
+          flex items-center justify-around
+          px-2 py-1.5
+          pb-[max(0.375rem,env(safe-area-inset-bottom))]
+        "
+      >
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`
+                flex flex-col items-center justify-center gap-0.5
+                flex-1 py-1 rounded-lg
+                text-[10px] font-medium
+                transition-colors duration-200
+                ${
+                  isActive
+                    ? "text-blue-600"
+                    : "text-gray-500 hover:text-blue-600"
+                }
+              `}
+            >
+              <Icon
+                size={18}
+                className={`
+                  transition-transform duration-200
+                  ${isActive ? "scale-110" : ""}
+                `}
+              />
+              <span className="leading-tight">{item.label}</span>
+              {isActive && (
+                <span className="w-1 h-1 bg-blue-600 rounded-full" />
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+    </>
   );
 };
 

@@ -17,7 +17,20 @@ import {
   FaCheckCircle,
   FaClock,
   FaStar,
+  FaTint, // 🩸 for blood group
+  FaBriefcase, // 💼 for major
 } from "react-icons/fa";
+
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+const MAJOR_OPTIONS = [
+  "finance & banking",
+  "marketing",
+  "management",
+  "accounting",
+];
+
+const SENIOR_SEMESTERS = ["7th", "8th"];
 
 const CRProfile = () => {
   const { user } = useAuth();
@@ -30,69 +43,50 @@ const CRProfile = () => {
     role: "",
     semester: "",
     session: "",
+    bloodGroup: "", // ✅ new
+    major: "",       // ✅ new
   });
   const [message, setMessage] = useState({ type: "", text: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [fullUserData, setFullUserData] = useState(null);
   const [isFetching, setIsFetching] = useState(true);
 
-  // Debug: Log user data
   useEffect(() => {
     console.log("User from AuthContext:", user);
   }, [user]);
 
-  // Fetch additional user data from database
   useEffect(() => {
     const fetchUserData = async () => {
-      // Try to get user ID from different possible locations
       const userId = user?.id || user?._id;
-
-      console.log("Fetching user data for ID:", userId);
-
       if (!userId) {
-        console.error("No user ID found in user object:", user);
-        // Use the user from AuthContext as fallback
-        if (user) {
-          setFullUserData(user);
-        }
+        if (user) setFullUserData(user);
         setIsFetching(false);
         return;
       }
-
       try {
         const response = await fetch(`/api/user/profile`);
         const data = await response.json();
-        console.log("Fetched user data response:", data);
-
         if (data.success) {
           setFullUserData(data.data);
         } else {
-          console.error("Failed to fetch user data:", data.message);
-          // Fallback to user from AuthContext
           setFullUserData(user);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        // Fallback to user from AuthContext
         setFullUserData(user);
       } finally {
         setIsFetching(false);
       }
     };
 
-    if (user) {
-      fetchUserData();
-    } else {
-        //eslint-disable-next-line
-      setIsFetching(false);
-    }
+    if (user) fetchUserData();
+    else setIsFetching(false);
+    //eslint-disable-next-line
   }, [user]);
 
   // Sync form data with fullUserData
   useEffect(() => {
     if (fullUserData) {
-      console.log("Setting form data from fullUserData:", fullUserData);
-      //eslint-disable-next-line
       setFormData({
         name: fullUserData.name || "",
         email: fullUserData.email || "",
@@ -101,6 +95,8 @@ const CRProfile = () => {
         role: fullUserData.role || "cr",
         semester: fullUserData.semester || "N/A",
         session: fullUserData.session || "N/A",
+        bloodGroup: fullUserData.bloodGroup || "", // ✅ new
+        major: fullUserData.major || "",           // ✅ new
       });
     }
   }, [fullUserData]);
@@ -115,17 +111,23 @@ const CRProfile = () => {
     setMessage({ type: "", text: "" });
 
     const userId = user?.id || user?._id;
+    const isSenior = SENIOR_SEMESTERS.includes(displayData?.semester);
 
     try {
+      const payload = {
+        id: userId,
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        bloodGroup: formData.bloodGroup || "", // ✅ always sent
+        // ✅ major only for 7th/8th
+        ...(isSenior ? { major: formData.major || "" } : {}),
+      };
+
       const response = await fetch("/api/user/update-profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: userId,
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -141,6 +143,8 @@ const CRProfile = () => {
           name: data.data.name,
           phone: data.data.phone || "",
           email: data.data.email,
+          bloodGroup: data.data.bloodGroup || "",
+          major: data.data.major || "",
         };
         localStorage.setItem("user", JSON.stringify(updatedUser));
 
@@ -167,23 +171,17 @@ const CRProfile = () => {
       case "admin":
         return { color: "bg-red-100 text-red-700", label: "Administrator" };
       case "faculty":
-        return {
-          color: "bg-purple-100 text-purple-700",
-          label: "Faculty Member",
-        };
+        return { color: "bg-purple-100 text-purple-700", label: "Faculty Member" };
       case "cr":
-        return {
-          color: "bg-green-100 text-green-700",
-          label: "Class Representative",
-        };
+        return { color: "bg-green-100 text-green-700", label: "Class Representative" };
       default:
         return { color: "bg-blue-100 text-blue-700", label: "Student" };
     }
   };
 
-  // Determine which data to display - prioritize fullUserData over user
   const displayData = fullUserData || user;
   const roleBadge = getRoleBadge(displayData?.role);
+  const isSeniorSemester = SENIOR_SEMESTERS.includes(displayData?.semester);
 
   if (isFetching) {
     return (
@@ -205,8 +203,6 @@ const CRProfile = () => {
       </div>
     );
   }
-
-  console.log("Display Data:", displayData);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -271,17 +267,31 @@ const CRProfile = () => {
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-gray-600">
+                  <FaTint className="text-red-500" />
+                  <span className="text-sm">
+                    Blood:{" "}
+                    <strong>{displayData?.bloodGroup || "Not provided"}</strong>
+                  </span>
+                </div>
+                {isSeniorSemester && (
+                  <div className="flex items-center gap-3 text-gray-600">
+                    <FaBriefcase className="text-indigo-500" />
+                    <span className="text-sm capitalize">
+                      Major:{" "}
+                      <strong>{displayData?.major || "Not assigned"}</strong>
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 text-gray-600">
                   <FaCalendarAlt className="text-gray-400" />
                   <span className="text-sm">
-                    Semester:{" "}
-                    <strong>{displayData?.semester || "N/A"}</strong>
+                    Semester: <strong>{displayData?.semester || "N/A"}</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-gray-600">
                   <FaCalendarAlt className="text-gray-400" />
                   <span className="text-sm">
-                    Session:{" "}
-                    <strong>{displayData?.session || "N/A"}</strong>
+                    Session: <strong>{displayData?.session || "N/A"}</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-gray-600">
@@ -359,6 +369,24 @@ const CRProfile = () => {
                           {displayData?.phone || "Not provided"}
                         </p>
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">
+                          Blood Group
+                        </label>
+                        <p className="text-gray-900 text-lg">
+                          {displayData?.bloodGroup || "Not provided"}
+                        </p>
+                      </div>
+                      {isSeniorSemester && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">
+                            Major
+                          </label>
+                          <p className="text-gray-900 text-lg capitalize">
+                            {displayData?.major || "Not assigned"}
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium text-gray-500 mb-1">
                           Semester
@@ -462,6 +490,58 @@ const CRProfile = () => {
                         </p>
                       </div>
 
+                      {/* ✅ Blood Group */}
+                      <div>
+                        <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
+                          <FaTint className="text-red-500" /> Blood Group
+                        </label>
+                        <select
+                          name="bloodGroup"
+                          value={formData.bloodGroup}
+                          onChange={handleInputChange}
+                          className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                        >
+                          <option value="">Not specified</option>
+                          {BLOOD_GROUPS.map((bg) => (
+                            <option key={bg} value={bg}>
+                              {bg}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* ✅ Major — only for 7th & 8th semester */}
+                      {isSeniorSemester && (
+                        <div>
+                          <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
+                            <FaBriefcase className="text-indigo-500" /> Major
+                            Subject
+                          </label>
+                          <select
+                            name="major"
+                            value={formData.major}
+                            onChange={handleInputChange}
+                            className="w-full text-gray-700 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white capitalize"
+                          >
+                            <option value="">Not assigned</option>
+                            {MAJOR_OPTIONS.map((m) => (
+                              <option key={m} value={m}>
+                                {m
+                                  .split(" ")
+                                  .map(
+                                    (w) =>
+                                      w.charAt(0).toUpperCase() + w.slice(1)
+                                  )
+                                  .join(" ")}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Required for 7th & 8th semester students
+                          </p>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-gray-700 mb-2 font-medium">
                           Semester
@@ -503,8 +583,7 @@ const CRProfile = () => {
                       >
                         <FaSave /> {isLoading ? "Saving..." : "Save Changes"}
                       </button>
-                      <button
-                        type="button"
+                      <button                        type="button"
                         onClick={() => {
                           setIsEditing(false);
                           setFormData({
@@ -515,6 +594,8 @@ const CRProfile = () => {
                             role: displayData?.role || "cr",
                             semester: displayData?.semester || "N/A",
                             session: displayData?.session || "N/A",
+                            bloodGroup: displayData?.bloodGroup || "",
+                            major: displayData?.major || "",
                           });
                           setMessage({ type: "", text: "" });
                         }}
@@ -578,7 +659,7 @@ const CRProfile = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Change Password Card */}
             <ChangePassword
               userEmail={displayData?.email}
