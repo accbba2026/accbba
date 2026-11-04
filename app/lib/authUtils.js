@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import User from '@/app/models/User';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'bba-is-awesome';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // ✅ No expiry - token lasts until sessionToken changes
 // Generate JWT token WITH sessionToken embedded

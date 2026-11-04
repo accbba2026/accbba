@@ -1406,18 +1406,6 @@ const CRAssignmentsPage = () => {
                       className="w-full text-gray-600 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="block text-gray-700 mb-2 font-medium text-sm sm:text-base">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      name="dueDate"
-                      value={formData.dueDate}
-                      onChange={handleInputChange}
-                      className="w-full text-gray-600 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                    />
-                  </div>
                 </div>
 
                 {/* Instructions */}
@@ -1490,20 +1478,54 @@ const CRAssignmentsPage = () => {
                 {/* PDF File Upload */}
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium text-sm sm:text-base">
-                    PDF File (Optional)
+                    PDF File *
                   </label>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    className="w-full text-gray-600 text-sm"
-                  />
+                  <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/30">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center justify-center text-center pointer-events-none">
+                      <svg
+                        className="w-10 h-10 text-gray-400 mb-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                        />
+                      </svg>
+                      <p className="text-gray-600 text-sm font-medium">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-gray-400 text-xs mt-1">
+                        PDF files only
+                      </p>
+                    </div>
+                  </div>
                   {isEditing && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                      <svg
+                        className="w-3 h-3"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
                       Leave empty to keep existing file
                     </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-2">
                     Maximum file size: 10MB. Only PDF files are allowed.
                   </p>
                 </div>

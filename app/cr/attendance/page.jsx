@@ -559,7 +559,7 @@ const CRAttendancePage = () => {
         
         @media print {
           @page { size: A4 landscape; margin: 0.15cm; }
-          .print-hide { display: none !important; }
+          .print-hide { display: none !important; visibility: hidden !important; }
           body { padding: 0; margin: 0; font-size: 5pt !important; line-height: 1.1 !important; }
           .whitespace-nowrap { white-space: normal !important; }
           [class*="min-w-"] { min-width: 0 !important; } 
@@ -576,6 +576,7 @@ const CRAttendancePage = () => {
           .w-6, .h-6 { width: 9px !important; height: 9px !important; min-width: 9px !important; } 
           .text-\\[10px\\] { font-size: 4pt !important; padding: 0 !important; line-height: 1 !important; } 
           .gap-2 { gap: 1px !important; }
+          .flex.items-center { display: inline-flex !important; }
           .sticky, .left-0, .left-\\[100px\\] { position: static !important; }
         }
         
@@ -986,7 +987,7 @@ const CRAttendancePage = () => {
                                 </span>
                               )}
                               {isSenior && student.major && (
-                                <span className="text-[9px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded capitalize">
+                                <span className="print-hide text-[9px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded capitalize">
                                   {student.major.split(" ")[0]}
                                 </span>
                               )}

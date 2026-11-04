@@ -765,7 +765,7 @@ const CRStudentsPage = () => {
 
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
-                    <FiPhone /> Phone (Optional)
+                    <FiPhone /> Phone *
                   </label>
                   <input
                     type="tel"
@@ -796,7 +796,7 @@ const CRStudentsPage = () => {
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
                     <FiDroplet className="text-red-500" /> Blood Group
-                    (Optional)
+                    *
                   </label>
                   <select
                     name="bloodGroup"
