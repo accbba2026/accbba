@@ -1037,7 +1037,7 @@ const CRAttendancePage = () => {
                                       </div>
                                     ) : matchesMajor ? (
                                       <span className="text-gray-300 font-bold">
-                                        —
+                                        
                                       </span>
                                     ) : (
                                       <span className="text-gray-200 text-[9px]">

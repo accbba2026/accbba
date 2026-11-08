@@ -18,21 +18,17 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const semester = searchParams.get("semester") || currentUser.semester;
-    const majorQuery = searchParams.get("major"); // optional override
+    const majorQuery = searchParams.get("major");
 
-    const query = {
+    // ✅ Students of the CR's own semester (students + CRs of that semester)
+    const studentQuery = {
       collegeId: { $exists: true, $nin: [null, ""] },
       semester,
       role: { $in: ["student", "cr"] },
     };
+    if (majorQuery) studentQuery.major = majorQuery;
 
-    // ✅ Apply major filter only if explicitly requested.
-    // If omitted, return students of ALL majors in this semester.
-    if (majorQuery) {
-      query.major = majorQuery;
-    }
-
-    const students = await User.find(query)
+    const students = await User.find(studentQuery)
       .select(
         "name collegeId phone email major semester role bloodGroup comments session"
       )
@@ -43,9 +39,20 @@ export async function GET(request) {
       isCR: student._id.toString() === currentUser._id.toString(),
     }));
 
+    // ✅ CRs from OTHER semesters — read-only info
+    const otherSemesterCRs = await User.find({
+      role: "cr",
+      collegeId: { $exists: true, $nin: [null, ""] },
+      semester: { $ne: semester },
+      _id: { $ne: currentUser._id },
+    })
+      .select("name collegeId phone email semester session bloodGroup")
+      .sort({ semester: 1, name: 1 });
+
     return NextResponse.json({
       success: true,
       data: studentsWithFlag,
+      otherSemesterCRs,
       count: studentsWithFlag.length,
     });
   } catch (error) {

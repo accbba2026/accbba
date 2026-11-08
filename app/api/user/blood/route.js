@@ -20,8 +20,11 @@ export async function GET(request) {
       );
     }
 
-    // 1. Authenticate the requester to know their role
+    await connectToDatabase();
+
+    // 1. Authenticate the requester
     let requesterRole = "guest";
+    let requesterBloodGroup = null;
     const token =
       request.cookies.get("auth_token")?.value ||
       request.headers.get("Authorization")?.replace("Bearer ", "");
@@ -29,15 +32,31 @@ export async function GET(request) {
     if (token) {
       const decoded = verifyTokenForServer(token);
       if (decoded) {
-        // We only need the role, so we can just query the role field
-        const requester = await User.findById(decoded.id).select("role").lean();
+        const requester = await User.findById(decoded.id)
+          .select("role bloodGroup")
+          .lean();
         if (requester) {
           requesterRole = requester.role;
+          requesterBloodGroup = requester.bloodGroup;
         }
       }
     }
 
-    await connectToDatabase();
+    // ✅ Block students who haven't set their own blood group
+    if (
+      requesterRole === "student" &&
+      (!requesterBloodGroup || requesterBloodGroup.trim() === "")
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "BLOOD_GROUP_NOT_SET",
+          message:
+            "আপনার নিজের ব্লাড গ্রুপ আপডেট করা নেই, অন্যদের ব্লাড গ্রুপ দেখতে আগে CR এর মাধ্যমে আপনার নিজের ব্লাড গ্রুপ আপডেট করান, অথবা একদম নিচে এডমিনের সাথে যোগাযোগ করুন",
+        },
+        { status: 403 }
+      );
+    }
 
     // Base query: Match blood group and only active users
     const baseQuery = {
@@ -50,7 +69,9 @@ export async function GET(request) {
       ...baseQuery,
       semester: currentSemester,
     })
-      .select("name collegeId semester bloodGroup bloodDonationDates phone email session role")
+      .select(
+        "name collegeId semester bloodGroup bloodDonationDates phone email session role"
+      )
       .sort({ name: 1 })
       .lean();
 
@@ -59,16 +80,13 @@ export async function GET(request) {
       ...baseQuery,
       semester: { $ne: currentSemester },
     })
-      .select("name collegeId semester bloodGroup bloodDonationDates phone email session role")
+      .select(
+        "name collegeId semester bloodGroup bloodDonationDates phone email session role"
+      )
       .sort({ semester: 1, name: 1 })
       .lean();
 
-    // 4. Privacy Check: If requester is a student, strip phone numbers from OTHER semesters
-    if (requesterRole === "student") {
-      otherSemesterUsers.forEach((u) => {
-        u.phone = "hidden"; 
-      });
-    }
+    // ❌ REMOVED: The privacy check block that hid phone numbers for other semesters.
 
     // Combine them
     const allUsers = [...sameSemesterUsers, ...otherSemesterUsers];

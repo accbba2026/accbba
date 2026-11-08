@@ -39,6 +39,7 @@ const CRStudentsPage = () => {
   const [searchType, setSearchType] = useState("name");
   const [majorFilter, setMajorFilter] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [otherSemesterCRs, setOtherSemesterCRs] = useState([]); // ✅ new
 
   // Add Student Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -75,7 +76,7 @@ const CRStudentsPage = () => {
       if (data.success) {
         let allStudents = [...data.data];
 
-        // Add the CR themselves if not present
+        // Add the CR themselves if not present (unchanged)
         if (user && user.role === "cr" && user?.semester === crSemester) {
           const crExists = allStudents.some(
             (s) => s.collegeId === user.collegeId,
@@ -96,6 +97,7 @@ const CRStudentsPage = () => {
           }
         }
         setStudents(allStudents);
+        setOtherSemesterCRs(data.otherSemesterCRs || []); // ✅ new
       }
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -705,6 +707,93 @@ const CRStudentsPage = () => {
           </div>
         </div>
 
+        {/* ✅ Other Semester CRs — read-only */}
+        {otherSemesterCRs.length > 0 && (
+          <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+              <FaGraduationCap className="text-indigo-600" />
+              <h2 className="text-lg font-semibold text-gray-900">
+                Other Semester CRs
+              </h2>
+              <span className="ml-2 text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full">
+                {otherSemesterCRs.length}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr className="text-gray-600 text-xs uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left">CR</th>
+                    <th className="px-6 py-3 text-left">College ID</th>
+                    <th className="px-6 py-3 text-left">Semester</th>
+                    <th className="px-6 py-3 text-left">Session</th>
+                    <th className="px-6 py-3 text-left">Phone</th>
+                    <th className="px-6 py-3 text-left">Email</th>
+                    <th className="px-6 py-3 text-left">Blood</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {otherSemesterCRs.map((cr) => (
+                    <tr key={cr._id} className="hover:bg-indigo-50/40">
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                            <FiStar size={12} />
+                          </div>
+                          <span className="font-medium text-gray-900">
+                            {cr.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className="font-mono text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                          {cr.collegeId}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-gray-700 text-sm">
+                        {cr.semester}
+                      </td>
+                      <td className="px-6 py-3 text-gray-700 text-sm">
+                        {cr.session || "—"}
+                      </td>
+                      <td className="px-6 py-3 text-gray-700 text-sm">
+                        {cr.phone ? (
+                          <span className="flex items-center gap-1.5">
+                            <FiPhone size={12} className="text-gray-400" />
+                            {cr.phone}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3 text-gray-700 text-sm">
+                        {cr.email ? (
+                          <span className="flex items-center gap-1.5">
+                            <FiMail size={12} className="text-gray-400" />
+                            {cr.email}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3">
+                        {cr.bloodGroup ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                            <FiDroplet className="text-red-500" size={12} />
+                            {cr.bloodGroup}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Loading Overlay */}
         {loading && (
           <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
@@ -795,8 +884,7 @@ const CRStudentsPage = () => {
                 {/* ✅ Blood group */}
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium flex items-center gap-2">
-                    <FiDroplet className="text-red-500" /> Blood Group
-                    *
+                    <FiDroplet className="text-red-500" /> Blood Group *
                   </label>
                   <select
                     name="bloodGroup"
