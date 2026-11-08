@@ -337,20 +337,6 @@ const Blood = () => {
             CR এর মাধ্যমে আপনার নিজের ব্লাড গ্রুপ আপডেট করান, অথবা একদম নিচে
             এডমিনের সাথে যোগাযোগ করুন
           </p>
-          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-            <a
-              href="/contact"
-              className="px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition"
-            >
-              এডমিনের সাথে যোগাযোগ করুন
-            </a>
-            <a
-              href="/profile"
-              className="px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
-            >
-              প্রোফাইলে যান
-            </a>
-          </div>
           <p className="text-[11px] text-gray-400 mt-6 italic">
             * You will be able to search donors and add donation records once
             your blood group is set by your CR.
@@ -488,9 +474,9 @@ const Blood = () => {
               <ul className="space-y-3 text-sm text-gray-700 leading-relaxed list-decimal list-inside marker:text-red-500 marker:font-bold">
                 <li>চেষ্টা করুন যারা আগে ব্লাড দিয়েছে, এমন ব্যক্তিকে যোগাযোগ করার।</li>
                 <li>মেয়েরা সাধারণত ব্লাড দেয়না, নির্দিষ্ট মেয়ে শিক্ষার্থীকে না চিনে থাকলে তাদের যোগাযোগ করা থেকে বিরত থাকুন।</li>
-                <li>শুধুমাত্র নিকটাত্মীয়দের প্রয়োজনে ব্লাড দেওয়ার জন্য যোগাযোগ করুন। যেমনঃ বাবা, মা, ভাই, বোন, দাদা, দাদী, নানা, নানী।</li>
-                <li>আপনি চিনেন না এমন ব্যক্তিদের ব্লাড দেওয়ার জন্য এখান থেকে কাউকে যোগাযোগ করবেন না।</li>
-                <li>আপনি নিজে ব্লাড দিতে চাইলে ও নিকটাত্মিয়দের ব্যতিত ব্লাড দিবেন না।</li>
+                <li>শুধুমাত্র নিকটাত্মীয়দের ব্লাডের প্রয়োজনে এখান থেকে যোগাযোগ করুন। যেমনঃ বাবা, মা, ভাই, বোন, দাদা, দাদী, নানা, নানী।</li>
+                <li>আপনি চিনেন না এমন ব্যক্তির প্রয়োজনে এখান থেকে কাউকে যোগাযোগ করবেন না।</li>
+                <li>আপনি ব্লাড দিতে চাইলে ও যে চাইবে তার নিকটাত্নীয় ব্যতিত ব্লাড দিবেন না।</li>
                 <li>কেউ ব্লাড না দিতে চাইলে তাকে কোন প্রকার ব্যতিক্রম উপায়ে প্ররোচিত করবেন না।</li>
               </ul>
               
@@ -572,21 +558,26 @@ const Blood = () => {
               const isSameSem = u.semester === currentSemester;
               const donationStatus = getDonationStatus(u.bloodDonationDates);
               const isPhoneHidden = u.phone === "hidden";
-              const isFirstOtherSem =
-                index > 0 &&
-                users[index - 1].semester === currentSemester &&
-                !isSameSem;
+              
+              // ✅ Determine if this user is graduated
+              const isGraduated = u.semester === "graduated";
+              
+              // ✅ Identify if this is the start of a new section
+              const prevUser = index > 0 ? users[index - 1] : null;
+              const isSectionChange = index === 0 || 
+                (prevUser?.semester !== u.semester) || 
+                (isGraduated && prevUser?.session !== u.session);
 
               return (
                 <React.Fragment key={u._id}>
-                  {isFirstOtherSem && (
-                    <div className="relative py-3">
+                  {isSectionChange && (
+                    <div className="relative py-3 mt-4">
                       <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-gray-200"></div>
                       </div>
                       <div className="relative flex justify-center">
                         <span className="px-3 bg-gray-50 text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
-                          Other Semesters
+                          {isSameSem ? "" : isGraduated ? `Graduated (${u.session})` : "Other Semesters"}
                         </span>
                       </div>
                     </div>
@@ -603,7 +594,8 @@ const Blood = () => {
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-red-50 text-red-600 border border-red-100">
                           {u.bloodGroup}
                         </span>
-                        {isSameSem && (
+                        {/* ✅ Only show "Your Semester" tag if they actually match your semester and are not graduated */}
+                        {isSameSem && !isGraduated && (
                           <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
                             Your Semester
                           </span>

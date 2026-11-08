@@ -38,6 +38,9 @@ const MAJOR_OPTIONS = [
   "accounting",
 ];
 const SENIOR_SEMESTERS = ["7th", "8th"];
+// ✅ Added "graduated" here so they can have a major too
+const MAJOR_SEMESTERS = ["7th", "8th", "graduated"]; 
+
 const SEMESTER_ORDER = [
   "1st",
   "2nd",
@@ -48,8 +51,20 @@ const SEMESTER_ORDER = [
   "7th",
   "8th",
   "graduated",
-  "unassigned",
 ];
+
+// Add this right below your constants (BLOOD_GROUPS, MAJOR_OPTIONS, etc.)
+const getCurrentSession = () => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  
+  // For any month in 2026, startYear is 2025. 
+  // For any month in 2027, startYear is 2026.
+  const startYear = currentYear - 1;
+  const endYearStr = currentYear.toString().slice(-2);
+
+  return `${startYear}-${endYearStr}`; // e.g., "2025-26"
+};
 
 export default function StudentManagement() {
   const { user } = useAuth();
@@ -63,9 +78,10 @@ export default function StudentManagement() {
     email: "",
     bloodGroup: "",
     semester: "1st",
-    session: "2024-25",
+    session: getCurrentSession(),
     status: "active",
     role: "student",
+    major: "",
   });
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [bulkSemester, setBulkSemester] = useState("");
@@ -180,10 +196,17 @@ export default function StudentManagement() {
     e.preventDefault();
     setLoading(true);
     try {
+      // Clean payload
+      const payload = { ...formData };
+      // Remove major if not applicable
+      if (!MAJOR_SEMESTERS.includes(payload.semester)) {
+        delete payload.major;
+      }
+
       const response = await fetch("/api/user/create-student", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (data.success) {
@@ -194,8 +217,11 @@ export default function StudentManagement() {
           phone: "",
           email: "",
           bloodGroup: "",
+          semester: "1st",
+          session: getCurrentSession(),
           status: "active",
           role: "student",
+          major: "",
         });
         fetchStudents();
         fetchSemesterStats();
@@ -220,7 +246,7 @@ export default function StudentManagement() {
       bloodGroup: student.bloodGroup || "",
       major: student.major || "",
       semester: student.semester || "",
-      session: student.session || "2024-25",
+      session: student.session || getCurrentSession(),
       status: student.status || "active",
       role: student.role || "student",
     });
@@ -264,8 +290,7 @@ export default function StudentManagement() {
       }
     }
 
-    const isSenior = SENIOR_SEMESTERS.includes(editFormData.semester);
-    const wasSenior = SENIOR_SEMESTERS.includes(editingStudent?.semester);
+    const isMajorApplicable = MAJOR_SEMESTERS.includes(editFormData.semester);
 
     setLoading(true);
     try {
@@ -280,8 +305,9 @@ export default function StudentManagement() {
         session: editFormData.session,
         status: editFormData.status,
         role: editFormData.role,
-        // ✅ Send major only when relevant
-        ...(isSenior ? { major: editFormData.major || "" } : {}),
+        // ✅ Only clear major if they move back to 1st-6th. 
+        // If they go to Graduated, we keep it!
+        ...(isMajorApplicable ? { major: editFormData.major || "" } : { major: null }),
       };
 
       const response = await fetch("/api/user/update-student", {
@@ -293,9 +319,9 @@ export default function StudentManagement() {
       const data = await response.json();
       if (data.success) {
         let successMsg = "Student updated successfully!";
-        if (wasSenior && !isSenior) {
+        if (!isMajorApplicable && editingStudent.major) {
           successMsg =
-            "Student updated. Major was cleared because the semester changed below 7th.";
+            "Student updated. Major was cleared because the semester changed to 1st-6th.";
         }
         setMessage({ type: "success", text: successMsg });
         toast.success(successMsg);
@@ -481,9 +507,9 @@ export default function StudentManagement() {
       return;
     }
 
-    // ✅ Show Major column only when at least one printed student is 7th/8th
+    // ✅ Show Major column if any printed student has a major applicable semester
     const showMajor = studentsToPrint.some((s) =>
-      SENIOR_SEMESTERS.includes(s.semester),
+      MAJOR_SEMESTERS.includes(s.semester),
     );
 
     const rowsHtml = studentsToPrint
@@ -816,7 +842,6 @@ export default function StudentManagement() {
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
                       <FiDroplet className="text-red-500" /> Blood Group
-                      (Optional)
                     </label>
                     <select
                       name="bloodGroup"
@@ -851,13 +876,40 @@ export default function StudentManagement() {
                         "6th",
                         "7th",
                         "8th",
+                        "graduated",
                       ].map((s) => (
                         <option key={s} value={s}>
-                          {s} Semester
+                          {s === "graduated" ? "Graduated" : `${s} Semester`}
                         </option>
                       ))}
                     </select>
                   </div>
+                  
+                  {/* ✅ Dynamic Major field for Add form */}
+                  {MAJOR_SEMESTERS.includes(formData.semester) && (
+                    <div>
+                      <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
+                        <FiBriefcase className="text-indigo-500" /> Major Subject
+                      </label>
+                      <select
+                        name="major"
+                        value={formData.major}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 capitalize"
+                      >
+                        <option value="">Not assigned</option>
+                        {MAJOR_OPTIONS.map((m) => (
+                          <option key={m} value={m}>
+                            {m
+                              .split(" ")
+                              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                              .join(" ")}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium">
                       Session
@@ -1149,7 +1201,8 @@ export default function StudentManagement() {
                         <tbody>
                           {list.map((s) => {
                             const checked = selectedStudents.includes(s._id);
-                            const isSenior = SENIOR_SEMESTERS.includes(
+                            // ✅ Allow Graduated to show Major
+                            const isMajorApplicable = MAJOR_SEMESTERS.includes(
                               s.semester,
                             );
                             const commentCount = s.comments?.length || 0;
@@ -1186,7 +1239,7 @@ export default function StudentManagement() {
                                   )}
                                 </td>
                                 <td className="px-3 py-2">
-                                  {isSenior && s.major ? (
+                                  {isMajorApplicable && s.major ? (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 capitalize">
                                       <FiBriefcase size={11} /> {s.major}
                                     </span>
@@ -1364,8 +1417,8 @@ export default function StudentManagement() {
                   </select>
                 </div>
 
-                {/* ✅ Major — only when semester is 7th / 8th */}
-                {SENIOR_SEMESTERS.includes(editFormData.semester) && (
+                {/* ✅ Major — shows for 7th, 8th, and Graduated */}
+                {MAJOR_SEMESTERS.includes(editFormData.semester) && (
                   <div>
                     <label className="block text-gray-700 mb-2 text-sm font-medium flex items-center gap-2">
                       <FiBriefcase className="text-indigo-500" /> Major Subject
@@ -1387,7 +1440,7 @@ export default function StudentManagement() {
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Required for 7th & 8th semester students
+                      Applicable for 7th, 8th, and Graduated students
                     </p>
                   </div>
                 )}
@@ -1418,10 +1471,11 @@ export default function StudentManagement() {
                       </option>
                     ))}
                   </select>
-                  {SENIOR_SEMESTERS.includes(editingStudent.semester) &&
-                    !SENIOR_SEMESTERS.includes(editFormData.semester) && (
+                  {/* Warning only if moving back to 1st-6th */}
+                  {MAJOR_SEMESTERS.includes(editingStudent.semester) &&
+                    !MAJOR_SEMESTERS.includes(editFormData.semester) && (
                       <p className="text-xs text-amber-600 mt-1">
-                        ⚠ Major will be cleared (no longer 7th/8th)
+                        ⚠ Major will be cleared (not applicable for 1st-6th)
                       </p>
                     )}
                 </div>
