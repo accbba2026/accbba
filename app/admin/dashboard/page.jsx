@@ -1,4 +1,6 @@
 // app/admin/dashboard/page.jsx
+"use client";
+import { useAuth } from "@/app/context/AuthContext";
 import Link from "next/link";
 import React from "react";
 import { 
@@ -9,8 +11,10 @@ import {
   FaChalkboardTeacher,
   FaHistory
 } from "react-icons/fa";
+import { LuClipboardList } from "react-icons/lu";
 
 const Page = () => {
+  const {user} = useAuth();
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -98,6 +102,21 @@ const Page = () => {
                   <p className="text-white/80 text-sm mt-1">Track attendance</p>
                 </div>
               </Link>
+
+              {/* List generator */}
+              <Link
+                href={`/faculty/list-generator/${user?.id}`}
+                className="group relative overflow-hidden bg-gradient-to-br from-green-800 to-emerald-600 rounded-xl p-6 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mt-10 -mr-10"></div>
+                <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full -mb-10 -ml-10"></div>
+                <div className="relative z-10">
+                  <LuClipboardList className="text-white text-3xl mb-3" />
+                  <h3 className="text-white font-semibold text-lg">List Generator</h3>
+                  <p className="text-white/80 text-sm mt-1">Generate Custom lists</p>
+                </div>
+              </Link>
+
               {/* Courses Tab */}
               <Link
                 href="/faculty/courses"

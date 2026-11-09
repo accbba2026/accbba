@@ -18,11 +18,11 @@ export default function Footer() {
           <div className="text-center md:text-left max-w-md">
             <div className="flex items-center justify-center md:justify-start gap-3 mb-3">
               <h3 className="text-xl font-bold tracking-wide text-white">
-                Department of BBA
+                IT Support
               </h3>
             </div>
             <p className="text-sm text-emerald-100/80 leading-relaxed mb-4">
-              For any kind of website-related problems, bugs, or issues, please contact the Admin. I am here to help!
+              For any kind of website-related problems, bugs, or issues, please contact the Developer. I am here to help!
             </p>
           </div>
 
@@ -88,9 +88,6 @@ export default function Footer() {
         <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-xs text-gray-400 text-center sm:text-left">
             © {new Date().getFullYear()} Department of BBA, Adamjee Cantonment College. All rights reserved.
-          </p>
-          <p className="text-xs text-emerald-500/70 font-medium flex items-center gap-1">
-            Designed & Developed by Md Sabbir Hossin Ramjan <span className="text-red-500 ml-1">♥</span>
           </p>
         </div>
       </div>
